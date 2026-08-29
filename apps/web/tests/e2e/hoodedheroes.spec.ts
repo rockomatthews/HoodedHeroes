@@ -61,3 +61,16 @@ test("the headquarters door is the Society entrance", async ({ page }) => {
   await page.getByRole("button", { name: "Run policy suite" }).click();
   await expect(page.getByText("4/4 CHECKS PASSED")).toBeVisible();
 });
+
+test("Launch Bay validates and queues an original fixed-supply proposal", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
+  await page.getByRole("button", { name: "Open Launch Bay" }).click();
+  await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Night Signal");
+  await expect(page.getByText("9/9")).toBeVisible();
+  await page.getByRole("button", { name: "Submit signed proposal" }).click();
+  await expect(page.getByRole("button", { name: /queued for review/i })).toBeVisible();
+  await page.getByRole("slider", { name: "Creator allocation" }).fill("1200");
+  await expect(page.getByText("BLOCKED")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Submit signed proposal" })).toBeDisabled();
+});

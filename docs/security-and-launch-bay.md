@@ -1,6 +1,6 @@
 # Security and Launch Bay gates
 
-Launch Bay is intentionally absent from the executable prototype. It must never compile or execute arbitrary community uploads.
+Launch Bay now includes an executable proposal configurator and deterministic policy validator. It does not deploy contracts, move funds, or compile arbitrary community uploads.
 
 A Robinhood Chain v1 template may proceed only after static analysis, fuzz and invariant testing, reproducible builds, independent review, hero voting, and security-council approval. Templates enforce one-time fixed supply, creator allocation at or below 10%, at least 12-month creator vesting, contribution caps, minimum raise, refunds, locked liquidity, published source, explicit roles, and immutable transfer behavior.
 

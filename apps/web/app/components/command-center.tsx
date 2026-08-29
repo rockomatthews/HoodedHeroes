@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { DEFAULT_LAUNCH_PROPOSAL, type LaunchProposal, validateLaunchProposal } from "@hoodedheroes/shared";
 import commandCenterArt from "../../../../art/concepts/02-secret-command-center.png";
 
 type RoomId =
@@ -180,10 +181,51 @@ function RoomPanel({ room, onClose }: { room: Room; onClose: () => void }) {
           </div>
           <div className="bazaar-controls"><button onClick={() => setRunCount((count) => count + 1)}>▶ Run policy suite</button><b>{runCount ? `${checks.filter(([, pass]) => pass).length}/${checks.length} CHECKS PASSED` : "LOCAL DEMO RUNNER"}</b><small>Cloud execution stays disabled until hero authentication and sandbox controls are installed.</small></div>
         </div>
+      ) : room.id === "launch-bay" ? (
+        <LaunchBayBuilder />
       ) : (
         <div className="room-actions">{room.actions.map((action) => <button className={selectedAction === action ? "is-active" : ""} key={action} onClick={() => setSelectedAction(action)}><span>ACCESS</span>{action}<small>{selectedAction === action ? "SELECTED // PREVIEW READY" : "OPEN MODULE"}</small></button>)}</div>
       )}
       <footer className="room-footer"><b>HOODEDHEROES PRIVATE NETWORK</b><span>PREVIEW MODE // NO LIVE TRANSACTIONS</span></footer>
+    </div>
+  );
+}
+
+function LaunchBayBuilder() {
+  const [proposal, setProposal] = useState<LaunchProposal>(DEFAULT_LAUNCH_PROPOSAL);
+  const [submitted, setSubmitted] = useState(false);
+  const validation = useMemo(() => validateLaunchProposal(proposal), [proposal]);
+  const update = <Key extends keyof LaunchProposal>(key: Key, value: LaunchProposal[Key]) => {
+    setSubmitted(false);
+    setProposal((current) => ({ ...current, [key]: value }));
+  };
+
+  return (
+    <div className="launch-builder">
+      <div className="launch-modes" aria-label="Launch mode">
+        <button className={proposal.mode === "fixed" ? "is-active" : ""} onClick={() => update("mode", "fixed")}><b>SAFE FIXED</b><small>Known price · refundable minimum</small></button>
+        <button className={proposal.mode === "bonding" ? "is-active" : ""} onClick={() => update("mode", "bonding")}><b>FAIR CURVE</b><small>Visible graduation threshold</small></button>
+        <button disabled><b>CUSTOM</b><small>Security Council only</small></button>
+      </div>
+      <div className="launch-builder-grid">
+        <div className="launch-form">
+          <div className="launch-field launch-field--wide"><label>Project name<input aria-label="Project name" value={proposal.name} onChange={(event) => update("name", event.target.value)} /></label><label>Symbol<input aria-label="Token symbol" value={proposal.symbol} maxLength={10} onChange={(event) => update("symbol", event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} /></label></div>
+          <div className="launch-field launch-field--wide"><label>Fixed supply<input aria-label="Fixed supply" type="number" min="1" value={proposal.supply} onChange={(event) => update("supply", Number(event.target.value))} /></label><label>Quote asset<select aria-label="Quote asset" value={proposal.quoteAsset} onChange={(event) => update("quoteAsset", event.target.value as LaunchProposal["quoteAsset"])}><option>HERO</option><option>ETH</option></select></label></div>
+          <div className="launch-sliders">
+            <label>Creator allocation <b>{proposal.creatorAllocationBps / 100}%</b><input aria-label="Creator allocation" type="range" min="0" max="1500" step="25" value={proposal.creatorAllocationBps} onChange={(event) => update("creatorAllocationBps", Number(event.target.value))} /></label>
+            <label>Locked liquidity <b>{proposal.liquidityAllocationBps / 100}%</b><input aria-label="Liquidity allocation" type="range" min="4000" max="9500" step="100" value={proposal.liquidityAllocationBps} onChange={(event) => update("liquidityAllocationBps", Number(event.target.value))} /></label>
+            <label>Creator vesting <b>{proposal.vestingMonths} MO</b><input aria-label="Creator vesting" type="range" min="0" max="36" step="1" value={proposal.vestingMonths} onChange={(event) => update("vestingMonths", Number(event.target.value))} /></label>
+            <label>Wallet cap <b>{proposal.walletCapBps / 100}%</b><input aria-label="Wallet cap" type="range" min="0" max="1000" step="25" value={proposal.walletCapBps} onChange={(event) => update("walletCapBps", Number(event.target.value))} /></label>
+          </div>
+          <div className="launch-field launch-field--wide"><label>Minimum raise<input aria-label="Minimum raise" type="number" min="1" value={proposal.minimumRaise} onChange={(event) => update("minimumRaise", Number(event.target.value))} /></label><label>Graduates at<input aria-label="Graduation threshold" type="number" min="1" value={proposal.graduationThreshold} onChange={(event) => update("graduationThreshold", Number(event.target.value))} /></label></div>
+        </div>
+        <div className="launch-audit">
+          <div className="launch-score"><span>POLICY READINESS</span><strong>{validation.passed}/{validation.total}</strong><b className={validation.ready ? "is-ready" : "is-blocked"}>{validation.ready ? "READY FOR REVIEW" : "BLOCKED"}</b></div>
+          <div className="launch-checks">{validation.checks.map((check) => <div key={check.id} className={check.passed ? "is-pass" : "is-fail"} title={check.detail}><i>{check.passed ? "✓" : "×"}</i><span>{check.label}</span></div>)}</div>
+          <div className="launch-allocation"><span style={{ width: `${validation.publicAllocationBps / 100}%` }}>PUBLIC {validation.publicAllocationBps / 100}%</span><span style={{ width: `${proposal.liquidityAllocationBps / 100}%` }}>LP</span><span style={{ width: `${proposal.creatorAllocationBps / 100}%` }}>TEAM</span></div>
+        </div>
+      </div>
+      <div className="launch-pipeline"><span>DRAFT</span><i>→</i><span>CODE BAZAAR</span><i>→</i><span>FUZZ + AUDIT</span><i>→</i><span>HERO VOTE</span><i>→</i><span>TESTNET</span><button disabled={!validation.ready} onClick={() => setSubmitted(true)}>{submitted ? "✓ QUEUED FOR REVIEW" : "SUBMIT SIGNED PROPOSAL"}</button></div>
     </div>
   );
 }
