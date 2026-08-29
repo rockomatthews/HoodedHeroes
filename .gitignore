@@ -1,0 +1,17 @@
+node_modules
+.pnpm-store
+.next
+.turbo
+dist
+coverage
+test-results
+playwright-report
+*.tsbuildinfo
+.env
+.env.local
+out
+cache
+broadcast
+artifacts
+apps/web/AGENTS.md
+apps/web/CLAUDE.md

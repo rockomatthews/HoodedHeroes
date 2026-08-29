@@ -1,0 +1,14 @@
+{
+  "name": "hooded-heroes",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "dev": "pnpm --filter @hoodedheroes/web dev",
+    "build": "pnpm --filter @hoodedheroes/web build",
+    "lint": "pnpm --filter @hoodedheroes/web lint",
+    "test": "pnpm -r --if-present test",
+    "test:e2e": "pnpm --filter @hoodedheroes/web test:e2e",
+    "typecheck": "pnpm -r --if-present typecheck"
+  }
+}
