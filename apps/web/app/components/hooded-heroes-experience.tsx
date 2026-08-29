@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { CommandCenter } from "./command-center";
 
 type Hero = {
   name: string;
@@ -24,17 +25,18 @@ const HEROES: Hero[] = [
 export function HoodedHeroesExperience() {
   const [connected, setConnected] = useState(false);
   const [selectedHero, setSelectedHero] = useState<Hero | null>(null);
-  const [panel, setPanel] = useState<"society" | "developers" | null>(null);
+  const [inCommandCenter, setInCommandCenter] = useState(false);
+
+  if (inCommandCenter) {
+    return <CommandCenter onExit={() => setInCommandCenter(false)} />;
+  }
 
   return (
     <main className="comic-viewport">
       <div className="comic-cover">
         <div className="paper-grain" />
         <header className="cover-nav">
-          <button className="nav-tab nav-tab--active" onClick={() => { setPanel(null); setSelectedHero(null); }}>Home</button>
-          <button className="nav-tab" onClick={() => setSelectedHero(HEROES[0])}>Heroes</button>
-          <button className="nav-tab" onClick={() => setPanel("developers")}>Developers</button>
-          <button className="nav-hood" aria-label="HoodedHeroes home" onClick={() => { setPanel(null); setSelectedHero(null); }}><Image src="/brand/hoodedheroes-coin-emblem.png" alt="" fill sizes="6vw" priority /></button>
+          <button className="nav-hood" aria-label="HoodedHeroes home" onClick={() => setSelectedHero(null)}><Image src="/brand/hoodedheroes-coin-emblem.png" alt="" fill sizes="6vw" priority /></button>
         </header>
 
         <section className="cover-copy" aria-labelledby="cover-title">
@@ -53,7 +55,7 @@ export function HoodedHeroesExperience() {
           ))}
         </section>
 
-        <button className="restricted-door" aria-label="Enter the Society headquarters" onClick={() => setPanel("society")}>
+        <button className="restricted-door" aria-label="Enter the Society headquarters" onClick={() => setInCommandCenter(true)}>
           <div className="door-sign">Headquarters<br />Access restricted</div>
           <div className="door-frame"><span className="door-hood" /><i className="door-eye door-eye--left" /><i className="door-eye door-eye--right" /></div>
           <span className="door-action">Enter Society →</span>
@@ -67,10 +69,10 @@ export function HoodedHeroesExperience() {
         <div className="genesis-counter"><span className="mini-hoods"><i /><i /><i /></span><b /><div><strong>3,000</strong><small>Genesis Heroes</small></div></div>
         <div className="corner-copy">ROBINHOOD CHAIN // SEASON 00 // PROTOTYPE</div>
 
-        {(selectedHero || panel) && (
-          <div className="cover-modal" role="dialog" aria-modal="true" aria-label={selectedHero ? `${selectedHero.name} dossier` : `${panel} information`}>
-            <button className="modal-close" onClick={() => { setSelectedHero(null); setPanel(null); }} aria-label="Close panel">×</button>
-            {selectedHero ? <HeroDossier hero={selectedHero} /> : <InfoPanel kind={panel!} />}
+        {selectedHero && (
+          <div className="cover-modal" role="dialog" aria-modal="true" aria-label={`${selectedHero.name} dossier`}>
+            <button className="modal-close" onClick={() => setSelectedHero(null)} aria-label="Close panel">×</button>
+            <HeroDossier hero={selectedHero} />
           </div>
         )}
       </div>
@@ -83,17 +85,6 @@ function HeroDossier({ hero }: { hero: Hero }) {
     <div className={`dossier dossier--${hero.color}`}>
       <div className="dossier-art"><Image src={hero.image} alt="" fill sizes="45vw" /></div>
       <div className="dossier-copy"><span>{`${hero.codename} // FOUNDING FILE`}</span><h2>{hero.name}</h2><blockquote>“{hero.quote}”</blockquote><dl><div><dt>Origin role</dt><dd>{hero.role}</dd></div><div><dt>Signature power</dt><dd>{hero.power}</dd></div><div><dt>Genesis status</dt><dd>Unassigned</dd></div></dl><button>VIEW HERO CLASS</button></div>
-    </div>
-  );
-}
-
-function InfoPanel({ kind }: { kind: "society" | "developers" }) {
-  return (
-    <div className={`info-panel info-panel--${kind}`}>
-      <span>CLASSIFIED // CLEARANCE REQUIRED</span>
-      <h2>{kind === "society" ? "THE SOCIETY" : "THE WORKSHOP"}</h2>
-      <p>{kind === "society" ? "Three thousand genesis members. Six rival houses. Thirty-day seasons. Earn Reputation, craft equipment, and climb from Initiate to Legend." : "A private playground for tested code, community experiments, and audited fixed-supply launches. Nothing reaches the city without review."}</p>
-      <div className="info-stamps"><b>25K $HERO PREVIEW</b><b>1 HERO FULL ACCESS</b><b>NO LIVE TRANSACTIONS</b></div>
     </div>
   );
 }
