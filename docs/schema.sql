@@ -135,6 +135,18 @@ create table launch_reviews (
   unique (project_id, reviewer_wallet, kind, evidence_hash)
 );
 
+create table community_messages (
+  id uuid primary key,
+  idempotency_key text not null,
+  owner_wallet text not null references society_members(wallet_address),
+  body text not null check (char_length(body) between 1 and 280),
+  moderation_status text not null default 'visible' check (moderation_status in ('visible', 'hidden', 'review')),
+  created_at timestamptz not null default now(),
+  unique (owner_wallet, idempotency_key)
+);
+
 create index sandbox_sessions_owner_active_idx on sandbox_sessions(owner_wallet, expires_at desc);
 create index launches_chain_lifecycle_idx on launches(chain, lifecycle, created_at desc);
 create index launch_reviews_project_idx on launch_reviews(project_id, created_at desc);
+create index community_messages_visible_created_idx on community_messages(created_at desc) where moderation_status = 'visible';
+create index community_messages_wallet_created_idx on community_messages(owner_wallet, created_at desc);

@@ -34,6 +34,14 @@ test("the headquarters door is the Society entrance", async ({ page }) => {
   expect(dimensions.width).toBeLessThanOrEqual(dimensions.viewportWidth);
   expect(dimensions.height).toBeLessThanOrEqual(dimensions.viewportHeight);
 
+  await expect(page.getByRole("button", { name: "Open Community Signal and HoodedHeroes Creed" })).toBeVisible();
+  await page.getByRole("button", { name: "Open Community Signal and HoodedHeroes Creed" }).click();
+  await expect(page.getByRole("dialog", { name: "Community Signal panel" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "The HoodedHeroes Creed" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Community Signal live chat" })).toBeVisible();
+  await expect(page.getByText("Every utility bearing our crest is built by the community, tested by the community, and forever improved by the community.")).toBeVisible();
+  await page.getByRole("button", { name: "Close Community Signal" }).click();
+
   const destinations = [
     ["Open Mission Deck", "Mission Deck panel"],
     ["Open Assembly", "Assembly panel"],

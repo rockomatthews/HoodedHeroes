@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import commandCenterArt from "../../../../art/concepts/02-secret-command-center.png";
 import { CodeBazaarWorkbench } from "./code-bazaar-workbench";
+import { CommunitySignal } from "./community-signal";
 import { LaunchBayWorkbench } from "./launch-bay-workbench";
 
 type RoomId =
@@ -19,7 +20,8 @@ type RoomId =
   | "missions"
   | "vault"
   | "profile"
-  | "legend";
+  | "legend"
+  | "community-signal";
 
 type Room = {
   id: RoomId;
@@ -32,6 +34,12 @@ type Room = {
 };
 
 const ROOMS: Record<RoomId, Room> = {
+  "community-signal": {
+    id: "community-signal", label: "Community Signal", eyebrow: "THE HOODED HEROES CREED // LIVE SOCIETY CHAT", accent: "yellow",
+    summary: "The central signal belongs to every builder. Read the Creed, meet the society, and coordinate the next community-built utility.",
+    stats: [["Channel", "CREED-01"], ["Network", "HERO-GATED"], ["Purpose", "BUILD TOGETHER"]],
+    actions: ["Read the Creed", "Open live chat", "Builder roll call"],
+  },
   "mission-deck": {
     id: "mission-deck", label: "Mission Deck", eyebrow: "OPERATIONS // LIVE BRIEFINGS", accent: "red",
     summary: "Choose deterministic city operations, spend energy, and submit replayable action traces for signed scoring.",
@@ -137,6 +145,12 @@ export function CommandCenter({ onExit }: { onExit: () => void }) {
     <section className="command-viewport" aria-label="HoodedHeroes Command Center">
       <div className="command-stage">
         <Image className="command-art" src={commandCenterArt} alt="The HoodedHeroes Command Center, with interactive rooms arranged around a six-house city map" fill priority sizes="100vw" />
+        <button className="community-signal-beacon" aria-label="Open Community Signal and HoodedHeroes Creed" onClick={() => setActiveRoom("community-signal")}>
+          <span>THE CREED</span>
+          <strong>COMMUNITY BUILT.</strong>
+          <small>EVERY UTILITY // FOREVER IMPROVED</small>
+          <i><b /> COMMUNITY SIGNAL // LIVE</i>
+        </button>
         {HOTSPOTS.map((spot) => (
           <button
             key={spot.id}
@@ -167,6 +181,8 @@ function RoomPanel({ room, onClose }: { room: Room; onClose: () => void }) {
       </div>
       {room.id === "code-bazaar" ? (
         <CodeBazaarWorkbench />
+      ) : room.id === "community-signal" ? (
+        <CommunitySignal />
       ) : room.id === "launch-bay" ? (
         <LaunchBayWorkbench />
       ) : (
