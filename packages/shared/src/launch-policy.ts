@@ -1,12 +1,12 @@
 export type LaunchMode = "fixed" | "bonding";
-export type LaunchQuoteAsset = "ETH" | "HERO";
+export type LegacyLaunchQuoteAsset = "ETH" | "HERO";
 
 export type LaunchProposal = {
   name: string;
   symbol: string;
   supply: number;
   mode: LaunchMode;
-  quoteAsset: LaunchQuoteAsset;
+  quoteAsset: LegacyLaunchQuoteAsset;
   creatorAllocationBps: number;
   liquidityAllocationBps: number;
   vestingMonths: number;

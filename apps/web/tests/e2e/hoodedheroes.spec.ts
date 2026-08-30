@@ -59,18 +59,19 @@ test("the headquarters door is the Society entrance", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "Code Bazaar panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Code Bazaar" })).toBeVisible();
   await page.getByRole("button", { name: "Run policy suite" }).click();
-  await expect(page.getByText("4/4 CHECKS PASSED")).toBeVisible();
+  await expect(page.getByText("5/5 CHECKS PASSED")).toBeVisible();
 });
 
-test("Launch Bay validates and queues an original fixed-supply proposal", async ({ page }) => {
+test("Launch Bay validates a tri-chain pro-rata manifest and seals its review package", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
   await page.getByRole("button", { name: "Open Launch Bay" }).click();
   await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Night Signal");
-  await expect(page.getByText("9/9")).toBeVisible();
-  await page.getByRole("button", { name: "Submit signed proposal" }).click();
-  await expect(page.getByRole("button", { name: /queued for review/i })).toBeVisible();
-  await page.getByRole("slider", { name: "Creator allocation" }).fill("1200");
-  await expect(page.getByText("BLOCKED")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Submit signed proposal" })).toBeDisabled();
+  await expect(page.getByText("12/12")).toBeVisible();
+  await page.getByRole("button", { name: "Queue gated proposal" }).click();
+  await expect(page.getByRole("button", { name: /review package sealed/i })).toBeVisible();
+  await page.getByRole("button", { name: "SOLANA" }).click();
+  await expect(page.getByRole("textbox", { name: "Quote asset" })).toHaveValue("SOL");
+  await page.getByRole("button", { name: "METADATA" }).click();
+  await expect(page.getByText(/Metaplex · Uniswap List/i)).toBeVisible();
 });

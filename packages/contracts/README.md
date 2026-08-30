@@ -1,5 +1,7 @@
 # HoodedHeroes contracts
 
+Original HoodedHeroes sources are licensed under AGPL-3.0-or-later. The package now includes the fixed-supply Launch Bay v1 testnet candidate: `FixedSupplyLaunchToken`, `LaunchFactory`, `ProRataFairLaunch`, and an immutable referral registry. These contracts are unaudited and must not be used on mainnet.
+
 Unaudited testnet foundations only:
 
 - `HeroToken`: immutable one-billion `$HERO` supply with no owner or mint authority.

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { CommandCenter } from "./command-center";
 
@@ -67,6 +68,7 @@ export function HoodedHeroesExperience() {
         </button>
 
         <div className="genesis-counter"><span className="mini-hoods"><i /><i /><i /></span><b /><div><strong>3,000</strong><small>Genesis Heroes</small></div></div>
+        <Link className="genesis-launch-link" href="/launch/hoodedheroes-hero-genesis"><span>$HERO GENESIS</span><b>VIEW PUBLIC VESTIBULE →</b></Link>
         <div className="corner-copy">ROBINHOOD CHAIN // SEASON 00 // PROTOTYPE</div>
 
         {selectedHero && (
