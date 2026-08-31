@@ -169,7 +169,7 @@ function RoomPanel({ room, onClose }: { room: Room; onClose: () => void }) {
   const [selectedAction, setSelectedAction] = useState(room.actions[0]);
 
   return (
-    <div className={`room-panel room-panel--${room.accent}`} role="dialog" aria-modal="true" aria-label={`${room.label} panel`}>
+    <div className={`room-panel room-panel--${room.accent} ${room.id === "community-signal" ? "room-panel--signal" : ""}`} role="dialog" aria-modal="true" aria-label={`${room.label} panel`}>
       <button className="room-close" onClick={onClose} aria-label={`Close ${room.label}`}>×</button>
       <header className="room-heading">
         <span>{room.eyebrow}</span>

@@ -39,7 +39,11 @@ test("the headquarters door is the Society entrance", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "Community Signal panel" })).toBeVisible();
   await expect(page.getByRole("region", { name: "The HoodedHeroes Creed" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Community Signal live chat" })).toBeVisible();
-  await expect(page.getByText("Every utility bearing our crest is built by the community, tested by the community, and forever improved by the community.")).toBeVisible();
+  await expect(page.getByText("Every utility bearing our crest is built, tested, and forever improved by the community.")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Community Signal channels" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Live society activity" })).toBeVisible();
+  await page.getByRole("button", { name: /BUILDERS LOUNGE/ }).click();
+  await expect(page.getByText(/Share reproducible evidence/)).toBeVisible();
   await page.getByRole("button", { name: "Close Community Signal" }).click();
 
   const destinations = [
