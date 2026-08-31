@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hooded.world";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://hooded.example"),
+  metadataBase: new URL(siteUrl),
   title: "HOODED — Enter the Society",
   description: "A comic-book game and private builder society powered by $HOODED on Robinhood Chain.",
   openGraph: {
