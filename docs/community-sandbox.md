@@ -7,6 +7,7 @@ The Code Bazaar control plane is implemented with `@vercel/sandbox`, but it is f
 3. PostgreSQL contains a currently verified Genesis Hero member.
 4. The request has a signed, unexpired society session, same-origin headers, and an idempotency key.
 5. The repository is exactly `rockomatthews/HOODED` and `SANDBOX_BASE_COMMIT` is a reviewed full commit hash.
+6. `SANDBOX_REPOSITORY_URL` points to the current private or public GitHub transport URL for that approved source identity.
 
 ## Runtime images
 

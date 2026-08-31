@@ -4,10 +4,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { Sandbox } from "@vercel/sandbox";
 import { APPROVED_SANDBOX_REPOSITORIES, DEFAULT_SANDBOX_LIMITS, type SandboxCommandPreset, type SandboxRuntime } from "@hooded/shared";
 
-const REPOSITORY_URLS = {
-  "rockomatthews/HOODED": "https://github.com/rockomatthews/HOODED.git",
-} as const;
-
 const PRESET_COMMANDS: Record<SandboxCommandPreset, { cmd: string; args: string[] }> = {
   install: { cmd: "pnpm", args: ["install", "--frozen-lockfile", "--ignore-scripts"] },
   typecheck: { cmd: "pnpm", args: ["typecheck"] },
@@ -26,10 +22,12 @@ export async function createCommunitySandbox(input: { repository: string; baseCo
   if (!APPROVED_SANDBOX_REPOSITORIES.includes(input.repository as (typeof APPROVED_SANDBOX_REPOSITORIES)[number])) throw new Error("Repository is not approved");
   if (!/^[a-f0-9]{7,40}$/i.test(input.baseCommit)) throw new Error("Invalid base commit");
   const snapshotId = input.runtime === "solana-v1" ? process.env.SOLANA_SANDBOX_SNAPSHOT_ID : process.env.WEB_EVM_SANDBOX_SNAPSHOT_ID;
+  const repositoryUrl = process.env.SANDBOX_REPOSITORY_URL;
+  if (!snapshotId && (!repositoryUrl || !repositoryUrl.startsWith("https://github.com/"))) throw new Error("SANDBOX_REPOSITORY_URL must identify the approved GitHub source");
   const common = { runtime: "node24" as const, timeout: DEFAULT_SANDBOX_LIMITS.timeoutMs, resources: { vcpus: DEFAULT_SANDBOX_LIMITS.vcpus }, ports: [3000] };
   const sandbox = snapshotId
     ? await Sandbox.create({ ...common, source: { type: "snapshot", snapshotId }, networkPolicy: "deny-all" })
-    : await Sandbox.create({ ...common, source: { type: "git", url: REPOSITORY_URLS[input.repository as keyof typeof REPOSITORY_URLS], revision: input.baseCommit, depth: 1 }, networkPolicy: { allow: ["github.com", "*.githubusercontent.com", "registry.npmjs.org", "*.npmjs.org"] } });
+    : await Sandbox.create({ ...common, source: { type: "git", url: repositoryUrl!, revision: input.baseCommit, depth: 1 }, networkPolicy: { allow: ["github.com", "*.githubusercontent.com", "registry.npmjs.org", "*.npmjs.org"] } });
   if (!snapshotId) await sandbox.updateNetworkPolicy("deny-all");
   return {
     id: randomUUID(),
