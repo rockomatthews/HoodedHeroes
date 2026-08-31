@@ -26,6 +26,25 @@ test("wallet preview state is clearly simulated", async ({ page }) => {
   await expect(page.getByText(/preview clearance/i)).toBeVisible();
 });
 
+test("mobile Command Center uses a zoomed comic district rail", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chrome", "Mobile navigation only");
+  await page.goto("/");
+  await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
+  const viewport = page.getByRole("region", { name: "HoodedHeroes Command Center" });
+  const districtRail = page.getByRole("navigation", { name: "Command Center district navigation" });
+  await expect(districtRail).toBeVisible();
+  const initial = await viewport.evaluate((element) => ({ left: element.scrollLeft, width: element.clientWidth, world: element.scrollWidth }));
+  expect(initial.world).toBeGreaterThan(initial.width * 2);
+
+  await districtRail.getByRole("button", { name: /LAUNCH/ }).click();
+  await expect(page.getByText("LAUNCH DISTRICT")).toBeVisible();
+  await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(initial.left + 150);
+
+  await districtRail.getByRole("button", { name: /VAULT/ }).click();
+  await expect(page.getByText("VAULT DISTRICT")).toBeVisible();
+  await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeLessThan(initial.left);
+});
+
 test("the headquarters door is the Society entrance", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();

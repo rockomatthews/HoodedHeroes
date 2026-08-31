@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import commandCenterArt from "../../../../art/concepts/02-secret-command-center.png";
 import { CodeBazaarWorkbench } from "./code-bazaar-workbench";
 import { CommunitySignal } from "./community-signal";
@@ -137,12 +137,47 @@ const HOTSPOTS: { id: RoomId | "home"; className: string; label: string }[] = [
   { id: "profile", className: "hotspot--profile", label: "Open Profile" },
 ];
 
+const MOBILE_ZONES = [
+  { id: "briefing", label: "MISSION", icon: "!", x: 0.34 },
+  { id: "bazaar", label: "CODE", icon: "</>", x: 0.55 },
+  { id: "signal", label: "SIGNAL", icon: "◆", x: 0.525 },
+  { id: "launch", label: "LAUNCH", icon: "▲", x: 0.79 },
+  { id: "vault", label: "VAULT", icon: "◉", x: 0.32 },
+  { id: "workshop", label: "GEAR", icon: "✦", x: 0.72 },
+  { id: "houses", label: "HOUSES", icon: "⬡", x: 0.91 },
+] as const;
+
 export function CommandCenter({ onExit }: { onExit: () => void }) {
   const [activeRoom, setActiveRoom] = useState<RoomId | null>(null);
+  const [mobileZone, setMobileZone] = useState("SIGNAL");
+  const viewportRef = useRef<HTMLElement>(null);
   const active = activeRoom ? ROOMS[activeRoom] : null;
 
+  function travelTo(x: number, label: string) {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    setActiveRoom(null);
+    setMobileZone(label);
+    viewport.scrollTo({ left: Math.max(0, viewport.scrollWidth * x - viewport.clientWidth / 2), behavior: "smooth" });
+  }
+
+  function trackMobileZone() {
+    const viewport = viewportRef.current;
+    if (!viewport || viewport.scrollWidth <= viewport.clientWidth) return;
+    const position = (viewport.scrollLeft + viewport.clientWidth / 2) / viewport.scrollWidth;
+    const nearest = MOBILE_ZONES.reduce((best, zone) => Math.abs(zone.x - position) < Math.abs(best.x - position) ? zone : best);
+    setMobileZone((current) => current === nearest.label ? current : nearest.label);
+  }
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !window.matchMedia("(max-aspect-ratio: 1/1)").matches) return;
+    const frame = window.requestAnimationFrame(() => viewport.scrollTo({ left: Math.max(0, viewport.scrollWidth * 0.525 - viewport.clientWidth / 2) }));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   return (
-    <section className="command-viewport" aria-label="HoodedHeroes Command Center">
+    <section ref={viewportRef} className="command-viewport" aria-label="HoodedHeroes Command Center" onScroll={trackMobileZone}>
       <div className="command-stage">
         <Image className="command-art" src={commandCenterArt} alt="The HoodedHeroes Command Center, with interactive rooms arranged around a six-house city map" fill priority sizes="100vw" />
         <button className="community-signal-beacon" aria-label="Open Community Signal and HoodedHeroes Creed" onClick={() => setActiveRoom("community-signal")}>
@@ -161,6 +196,10 @@ export function CommandCenter({ onExit }: { onExit: () => void }) {
         ))}
         {active && <RoomPanel room={active} onClose={() => setActiveRoom(null)} />}
       </div>
+      <div className="mobile-map-hud" aria-hidden="true"><b>HH CITY TRANSIT</b><span>{active ? active.label.toUpperCase() : `${mobileZone} DISTRICT`}</span><i>{active ? "ROOM OPEN // SCROLL DOSSIER" : "SWIPE THE MAP"}</i></div>
+      <nav className="mobile-map-dock" aria-label="Command Center district navigation">
+        {MOBILE_ZONES.map((zone) => <button key={zone.id} className={mobileZone === zone.label ? "is-active" : ""} onClick={() => travelTo(zone.x, zone.label)}><i>{zone.icon}</i><span>{zone.label}</span></button>)}
+      </nav>
     </section>
   );
 }
