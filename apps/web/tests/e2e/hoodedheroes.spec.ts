@@ -33,6 +33,7 @@ test("mobile Command Center uses a zoomed comic district rail", async ({ page },
   const viewport = page.getByRole("region", { name: "HoodedHeroes Command Center" });
   const districtRail = page.getByRole("navigation", { name: "Command Center district navigation" });
   await expect(districtRail).toBeVisible();
+  await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(300);
   const initial = await viewport.evaluate((element) => ({ left: element.scrollLeft, width: element.clientWidth, world: element.scrollWidth }));
   expect(initial.world).toBeGreaterThan(initial.width * 2);
 
@@ -45,7 +46,8 @@ test("mobile Command Center uses a zoomed comic district rail", async ({ page },
   await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeLessThan(initial.left);
 });
 
-test("the headquarters door is the Society entrance", async ({ page }) => {
+test("the headquarters door is the Society entrance", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile-chrome", "Mobile navigation is covered by the district-rail flow");
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
   await expect(page.getByRole("region", { name: "HoodedHeroes Command Center" })).toBeVisible();
@@ -89,8 +91,13 @@ test("the headquarters door is the Society entrance", async ({ page }) => {
   await page.getByRole("button", { name: "Open Code Bazaar" }).click();
   await expect(page.getByRole("dialog", { name: "Code Bazaar panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Code Bazaar" })).toBeVisible();
+  await expect(page.getByText("FOUNDRY-01 // FIRST SOCIETY PROJECT")).toBeVisible();
+  await expect(page.getByText("v0.1.0-testnet")).toBeVisible();
   await page.getByRole("button", { name: "Run policy suite" }).click();
   await expect(page.getByText("5/5 CHECKS PASSED")).toBeVisible();
+  await page.getByRole("button", { name: "OPEN BOUNTIES" }).click();
+  await expect(page.getByText("LB-001 // security")).toBeVisible();
+  await expect(page.getByText(/Prove conservation across every claim/i)).toBeVisible();
 });
 
 test("Launch Bay validates a tri-chain pro-rata manifest and seals its review package", async ({ page }) => {

@@ -21,6 +21,8 @@ The application opens in preview mode. The wallet control is deliberately simula
 - `art/concepts`: three approved concept directions and their prompt record.
 - `art/characters`: preserved v1 designs and v2 website cutouts for Inferno, Volt, Pulse, Circuit, and Phantom.
 - `docs`: architecture, economy, persistence schema, security, and Vercel notes.
+- `docs/vault`: an Obsidian-compatible, repository-native project knowledge graph.
+- `projects/launch-bay`: the first Code Bazaar community project, including its charter, contribution contract, backlog, and release gates.
 
 ## Community Sandbox and Launch Bay
 
