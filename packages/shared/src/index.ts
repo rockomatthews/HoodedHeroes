@@ -1,7 +1,7 @@
 export const BRAND = {
-  name: "HoodedHeroes",
-  displayName: "HOODED HEROES",
-  token: "$HERO",
+  name: "HOODED",
+  displayName: "HOODED",
+  token: "$HOODED",
   tagline: "ENTER THE SOCIETY. BUILD THE NEXT LEGEND.",
   chainId: 4663,
 } as const;

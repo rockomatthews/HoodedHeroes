@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { APPROVED_SANDBOX_REPOSITORIES } from "@hoodedheroes/shared";
+import { APPROVED_SANDBOX_REPOSITORIES } from "@hooded/shared";
 import { createCommunitySandbox, sandboxEnabled } from "@/lib/server/sandbox-control";
 import { getSocietySession } from "@/lib/server/session";
 import { assertSameOrigin, publicError, requireIdempotencyKey } from "@/lib/server/request-security";
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     assertSameOrigin(request);
     const key = requireIdempotencyKey(request);
     const session = await getSocietySession();
-    if (!session || session.access !== "hero") return Response.json({ error: "A HoodedHero-gated session is required" }, { status: 403 });
+    if (!session || session.access !== "hero") return Response.json({ error: "A Genesis-Hero-gated session is required" }, { status: 403 });
     if (!databaseConfigured()) return Response.json({ error: "PostgreSQL is not configured", enabled: false }, { status: 503 });
     if (!sandboxEnabled()) return Response.json({ error: "Vercel Sandbox is not enabled", enabled: false }, { status: 503 });
     const body = bodySchema.parse(await request.json());

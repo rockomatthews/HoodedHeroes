@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://hoodedheroes.example"),
-  title: "HoodedHeroes — Enter the Society",
-  description: "A comic-book game and private builder society powered by $HERO on Robinhood Chain.",
+  metadataBase: new URL("https://hooded.example"),
+  title: "HOODED — Enter the Society",
+  description: "A comic-book game and private builder society powered by $HOODED on Robinhood Chain.",
   openGraph: {
-    title: "HoodedHeroes — Enter the Society",
+    title: "HOODED — Enter the Society",
     description: "Three thousand genesis heroes. One secret builder society.",
-    images: [{ url: "/og.png", width: 1536, height: 1024, alt: "HoodedHeroes comic entry portal" }],
+    images: [{ url: "/og.png", width: 1536, height: 1024, alt: "HOODED comic entry portal" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "HoodedHeroes — Enter the Society",
+    title: "HOODED — Enter the Society",
     description: "Three thousand genesis heroes. One secret builder society.",
     images: ["/og.png"],
   },
@@ -25,4 +25,3 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
-

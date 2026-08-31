@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRound } from "@hoodedheroes/game-engine";
+import { createRound } from "@hooded/game-engine";
 import { issueScoreSession, replayKey, verifyScore } from "./index";
 
 const secret = "test-secret-at-least-32-characters-long";

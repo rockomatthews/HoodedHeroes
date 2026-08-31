@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
-import { HERO_GENESIS_MANIFEST, validateLaunchManifest, type LaunchManifestV1 } from "@hoodedheroes/shared";
+import { HOODED_GENESIS_MANIFEST, validateLaunchManifest, type LaunchManifestV1 } from "@hooded/shared";
 import { databaseConfigured, db } from "@/lib/server/database";
 import { getSocietySession } from "@/lib/server/session";
 import { assertSameOrigin, publicError, requireIdempotencyKey } from "@/lib/server/request-security";
 
 export async function GET() {
-  if (!databaseConfigured()) return Response.json({ launches: [HERO_GENESIS_MANIFEST], source: "bundled-testnet-manifest" });
+  if (!databaseConfigured()) return Response.json({ launches: [HOODED_GENESIS_MANIFEST], source: "bundled-testnet-manifest" });
   const sql = db();
   const rows = await sql`select manifest from launches order by created_at desc limit 50`;
   return Response.json({ launches: rows.map((row) => (row as Record<string, unknown>).manifest), source: "postgres" }, { headers: { "Cache-Control": "public, max-age=15, stale-while-revalidate=60" } });
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     assertSameOrigin(request);
     const key = requireIdempotencyKey(request);
     const session = await getSocietySession();
-    if (!session || session.access !== "hero") return Response.json({ error: "A HoodedHero-gated session is required" }, { status: 403 });
+    if (!session || session.access !== "hero") return Response.json({ error: "A Genesis-Hero-gated session is required" }, { status: 403 });
     if (!databaseConfigured()) return Response.json({ error: "PostgreSQL is not configured" }, { status: 503 });
     const manifest = await request.json() as LaunchManifestV1;
     const validation = validateLaunchManifest(manifest);

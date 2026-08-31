@@ -1,6 +1,5 @@
-import { HoodedHeroesExperience } from "./components/hooded-heroes-experience";
+import { HoodedExperience } from "./components/hooded-experience";
 
 export default function HomePage() {
-  return <HoodedHeroesExperience />;
+  return <HoodedExperience />;
 }
-

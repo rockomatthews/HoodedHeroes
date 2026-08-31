@@ -2,10 +2,10 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { Sandbox } from "@vercel/sandbox";
-import { APPROVED_SANDBOX_REPOSITORIES, DEFAULT_SANDBOX_LIMITS, type SandboxCommandPreset, type SandboxRuntime } from "@hoodedheroes/shared";
+import { APPROVED_SANDBOX_REPOSITORIES, DEFAULT_SANDBOX_LIMITS, type SandboxCommandPreset, type SandboxRuntime } from "@hooded/shared";
 
 const REPOSITORY_URLS = {
-  "rockomatthews/HoodedHeroes": "https://github.com/rockomatthews/HoodedHeroes.git",
+  "rockomatthews/HOODED": "https://github.com/rockomatthews/HOODED.git",
 } as const;
 
 const PRESET_COMMANDS: Record<SandboxCommandPreset, { cmd: string; args: string[] }> = {
@@ -13,7 +13,7 @@ const PRESET_COMMANDS: Record<SandboxCommandPreset, { cmd: string; args: string[
   typecheck: { cmd: "pnpm", args: ["typecheck"] },
   test: { cmd: "pnpm", args: ["test"] },
   build: { cmd: "pnpm", args: ["build"] },
-  "contract-test": { cmd: "pnpm", args: ["--filter", "@hoodedheroes/contracts", "test"] },
+  "contract-test": { cmd: "pnpm", args: ["--filter", "@hooded/contracts", "test"] },
   "security-scan": { cmd: "pnpm", args: ["audit", "--audit-level", "high"] },
 };
 

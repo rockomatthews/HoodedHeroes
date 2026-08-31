@@ -1,10 +1,10 @@
-import { HERO_GENESIS_MANIFEST } from "@hoodedheroes/shared";
+import { HOODED_GENESIS_MANIFEST } from "@hooded/shared";
 import { databaseConfigured, db } from "@/lib/server/database";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   if (!databaseConfigured()) {
-    if (projectId === HERO_GENESIS_MANIFEST.metadata.projectId) return Response.json(HERO_GENESIS_MANIFEST);
+    if (projectId === HOODED_GENESIS_MANIFEST.metadata.projectId) return Response.json(HOODED_GENESIS_MANIFEST);
     return Response.json({ error: "Launch not found" }, { status: 404 });
   }
   const sql = db();

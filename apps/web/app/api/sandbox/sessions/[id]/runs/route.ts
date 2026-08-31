@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     assertSameOrigin(request);
     const key = requireIdempotencyKey(request);
     const society = await getSocietySession();
-    if (!society || society.access !== "hero") return Response.json({ error: "A HoodedHero-gated session is required" }, { status: 403 });
+    if (!society || society.access !== "hero") return Response.json({ error: "A Genesis-Hero-gated session is required" }, { status: 403 });
     const { id } = await params;
     const body = bodySchema.parse(await request.json());
     const sql = db();

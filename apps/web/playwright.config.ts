@@ -5,6 +5,6 @@ export default defineConfig({
   fullyParallel: true,
   reporter: "line",
   use: { baseURL: "http://localhost:3001", trace: "retain-on-failure", screenshot: "only-on-failure" },
-  webServer: { command: "pnpm dev --hostname 127.0.0.1 --port 3001", url: "http://localhost:3001", reuseExistingServer: !process.env.CI, timeout: 120_000 },
+  webServer: { command: "pnpm build && pnpm start --hostname 127.0.0.1 --port 3001", url: "http://localhost:3001", reuseExistingServer: !process.env.CI, timeout: 120_000 },
   projects: [{ name: "desktop-chrome", use: { ...devices["Desktop Chrome"], channel: "chrome" } }, { name: "mobile-chrome", use: { ...devices["Pixel 7"], channel: "chrome" } }],
 });

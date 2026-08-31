@@ -19,7 +19,7 @@ export const DEFAULT_SANDBOX_LIMITS: SandboxLimits = {
 };
 
 export const APPROVED_SANDBOX_REPOSITORIES = [
-  "rockomatthews/HoodedHeroes",
+  "rockomatthews/HOODED",
 ] as const;
 
 export type SandboxSession = {

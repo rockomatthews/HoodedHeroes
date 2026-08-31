@@ -27,7 +27,7 @@ const CHANNEL_INTROS: Record<ChannelId, SignalMessage[]> = {
 };
 
 const SYSTEM_ACTIVITY: SignalActivity[] = [
-  { id: "activity-creed", actor: "SYSTEM", action: "pinned the HoodedHeroes Creed", channel: "SOCIETY", createdAt: "NOW" },
+  { id: "activity-creed", actor: "SYSTEM", action: "pinned the HOODED Creed", channel: "SOCIETY", createdAt: "NOW" },
   { id: "activity-build", actor: "CODE BAZAAR", action: "verified the LaunchManifest test suite", channel: "BUILDERS", createdAt: "VERIFIED" },
   { id: "activity-launch", actor: "LAUNCH BAY", action: "sealed the v1 review pipeline", channel: "REVIEW", createdAt: "READY" },
 ];
@@ -45,14 +45,14 @@ export function CommunitySignal() {
     try {
       const response = await fetch(`/api/community/messages?channel=${activeChannel}`, { cache: "no-store" });
       if (!response.ok) {
-        setNetworkState(response.status === 403 ? "HOODED HERO VERIFICATION REQUIRED" : "CREED BROADCAST // CHAT OFFLINE");
+        setNetworkState(response.status === 403 ? "GENESIS HERO VERIFICATION REQUIRED" : "CREED BROADCAST // CHAT OFFLINE");
         setPollingEnabled(false);
         return;
       }
       const payload = await response.json() as { messages: SignalMessage[]; activity: SignalActivity[] };
       setMessages([...CHANNEL_INTROS[activeChannel], ...payload.messages]);
       setActivity(payload.activity.length ? payload.activity : SYSTEM_ACTIVITY);
-      setNetworkState("LIVE // HERO-GATED NETWORK");
+      setNetworkState("LIVE // HOODED-GATED NETWORK");
     } catch {
       setNetworkState("CREED BROADCAST // CHAT OFFLINE");
     }
@@ -88,7 +88,7 @@ export function CommunitySignal() {
         body: JSON.stringify({ body, channel: activeChannel }),
       });
       if (!response.ok) {
-        setNetworkState(response.status === 403 ? "HOODED HERO VERIFICATION REQUIRED" : "SIGNAL REJECTED // TRY AGAIN");
+        setNetworkState(response.status === 403 ? "GENESIS HERO VERIFICATION REQUIRED" : "SIGNAL REJECTED // TRY AGAIN");
         return;
       }
       setDraft("");
@@ -102,8 +102,8 @@ export function CommunitySignal() {
 
   return (
     <div className="community-signal-room">
-      <section className="creed-card" aria-label="The HoodedHeroes Creed">
-        <span>THE HOODED HEROES CREED</span>
+      <section className="creed-card" aria-label="The HOODED Creed">
+        <span>THE HOODED CREED</span>
         <h3>WE BUILD<br /><b>TOGETHER.</b></h3>
         <blockquote>Every utility bearing our crest is built, tested, and forever improved by the community.</blockquote>
         <nav className="signal-channels" aria-label="Community Signal channels">

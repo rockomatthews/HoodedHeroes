@@ -1,4 +1,4 @@
-import { validateLaunchManifest, type LaunchManifestV1 } from "@hoodedheroes/shared";
+import { validateLaunchManifest, type LaunchManifestV1 } from "@hooded/shared";
 import { publicError } from "@/lib/server/request-security";
 
 export async function POST(request: Request) {

@@ -19,10 +19,10 @@ export function buildMetaplexMetadata(metadata: LaunchMetadataV1) {
 export function buildUniswapTokenList(metadata: LaunchMetadataV1, chainId: number) {
   if (!metadata.tokenAddress) throw new Error("Token address required for an EVM token list");
   return {
-    name: "HoodedHeroes Verified Launches",
+    name: "HOODED Verified Launches",
     timestamp: metadata.revision.timestamp,
     version: { major: 1, minor: 0, patch: metadata.revision.version },
-    keywords: ["hoodedheroes", "fair-launch", metadata.chain],
+    keywords: ["hooded", "fair-launch", metadata.chain],
     tokens: [{
       chainId,
       address: metadata.tokenAddress,

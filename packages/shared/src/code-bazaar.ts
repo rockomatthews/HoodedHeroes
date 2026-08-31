@@ -20,14 +20,14 @@ export const LAUNCH_BAY_PROJECT = {
   codename: "FOUNDRY-01",
   version: "0.1.0-testnet",
   license: "AGPL-3.0-or-later",
-  repository: "rockomatthews/HoodedHeroes",
+  repository: "rockomatthews/HOODED",
   branchPolicy: "pull-request-only",
-  mission: "Build the society's auditable fair-launch system and use the same public pipeline to rehearse the fixed one-billion-supply HERO genesis launch.",
+  mission: "Build the society's auditable fair-launch system and use the same public pipeline to rehearse the fixed one-billion-supply HOODED genesis launch.",
   releaseGate: "No mainnet deployment without independent audits, legal review, timelock rehearsal, and explicit approval.",
   workstreams: [
     { id: "launcher-core", label: "Launcher Core", path: "packages/contracts/src", stage: "hardening", checks: ["Foundry fuzz", "supply invariants", "refund invariants"] },
     { id: "manifest-studio", label: "Manifest Studio", path: "packages/shared/src/launch-manifest.ts", stage: "implemented", checks: ["12 policy gates", "golden vectors", "metadata formats"] },
-    { id: "hero-genesis", label: "HERO Genesis", path: "packages/contracts/src/HeroToken.sol", stage: "hardening", checks: ["1B fixed supply", "no mint authority", "Hero purchase integration"] },
+    { id: "hero-genesis", label: "HOODED Genesis", path: "packages/contracts/src/HoodedToken.sol", stage: "hardening", checks: ["1B fixed supply", "no mint authority", "Hero purchase integration"] },
     { id: "solana-adapter", label: "Solana Adapter", path: "programs/launch-bay", stage: "planned", checks: ["program-test", "authority revocation", "Raydium migration"] },
   ] satisfies readonly BazaarWorkstream[],
   bounties: [

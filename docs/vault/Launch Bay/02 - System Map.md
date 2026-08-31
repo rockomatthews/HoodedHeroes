@@ -15,8 +15,8 @@
 - `ProRataFairLaunch.sol`
 - `ImmutableReferralRegistry.sol`
 - `TokenVestingVault.sol`
-- `HeroToken.sol`
-- `HoodedHeroesGenesis.sol`
+- `HoodedToken.sol`
+- `HoodedGenesis.sol`
 
 ## Honest adapter status
 

@@ -35,9 +35,9 @@ type Room = {
 
 const ROOMS: Record<RoomId, Room> = {
   "community-signal": {
-    id: "community-signal", label: "Community Signal", eyebrow: "THE HOODED HEROES CREED // LIVE SOCIETY CHAT", accent: "yellow",
+    id: "community-signal", label: "Community Signal", eyebrow: "THE HOODED CREED // LIVE SOCIETY CHAT", accent: "yellow",
     summary: "The central signal belongs to every builder. Read the Creed, meet the society, and coordinate the next community-built utility.",
-    stats: [["Channel", "CREED-01"], ["Network", "HERO-GATED"], ["Purpose", "BUILD TOGETHER"]],
+    stats: [["Channel", "CREED-01"], ["Network", "HOODED-GATED"], ["Purpose", "BUILD TOGETHER"]],
     actions: ["Read the Creed", "Open live chat", "Builder roll call"],
   },
   "mission-deck": {
@@ -102,12 +102,12 @@ const ROOMS: Record<RoomId, Room> = {
   },
   vault: {
     id: "vault", label: "My Vault", eyebrow: "ASSETS // RECEIPTS", accent: "purple",
-    summary: "Inspect your HERO balance, earned credits, equipment, claim receipts, and season rewards in one place.",
-    stats: [["HERO", "125,000"], ["Credits", "3,450"], ["Items", "07"]],
+    summary: "Inspect your HOODED balance, earned credits, equipment, claim receipts, and season rewards in one place.",
+    stats: [["$HOODED", "125,000"], ["Credits", "3,450"], ["Items", "07"]],
     actions: ["Balances", "Equipment", "Reward receipts"],
   },
   profile: {
-    id: "profile", label: "Hero Profile", eyebrow: "HH-0001 // INITIATE", accent: "yellow",
+    id: "profile", label: "Hero Profile", eyebrow: "H-0001 // INITIATE", accent: "yellow",
     summary: "Manage your hero dossier, earned rank, house identity, ability loadout, and public builder reputation.",
     stats: [["Reputation", "1,250"], ["Renown", "680"], ["Tenure", "07 DAYS"]],
     actions: ["Dossier", "Progression", "Builder identity"],
@@ -177,10 +177,11 @@ export function CommandCenter({ onExit }: { onExit: () => void }) {
   }, []);
 
   return (
-    <section ref={viewportRef} className="command-viewport" aria-label="HoodedHeroes Command Center" onScroll={trackMobileZone}>
+    <section ref={viewportRef} className="command-viewport" aria-label="HOODED Command Center" onScroll={trackMobileZone}>
       <div className="command-stage">
-        <Image className="command-art" src={commandCenterArt} alt="The HoodedHeroes Command Center, with interactive rooms arranged around a six-house city map" fill priority sizes="100vw" />
-        <button className="community-signal-beacon" aria-label="Open Community Signal and HoodedHeroes Creed" onClick={() => setActiveRoom("community-signal")}>
+        <Image className="command-art" src={commandCenterArt} alt="The HOODED Command Center, with interactive rooms arranged around a six-house city map" fill priority sizes="100vw" />
+        <div className="command-brand-overlay" aria-hidden="true"><strong>HOODED</strong><span>COMMAND CENTER</span></div>
+        <button className="community-signal-beacon" aria-label="Open Community Signal and HOODED Creed" onClick={() => setActiveRoom("community-signal")}>
           <span>THE CREED</span>
           <strong>COMMUNITY BUILT.</strong>
           <small>EVERY UTILITY // FOREVER IMPROVED</small>
@@ -196,7 +197,7 @@ export function CommandCenter({ onExit }: { onExit: () => void }) {
         ))}
         {active && <RoomPanel room={active} onClose={() => setActiveRoom(null)} />}
       </div>
-      <div className="mobile-map-hud" aria-hidden="true"><b>HH CITY TRANSIT</b><span>{active ? active.label.toUpperCase() : `${mobileZone} DISTRICT`}</span><i>{active ? "ROOM OPEN // SCROLL DOSSIER" : "SWIPE THE MAP"}</i></div>
+      <div className="mobile-map-hud" aria-hidden="true"><b>HOODED TRANSIT</b><span>{active ? active.label.toUpperCase() : `${mobileZone} DISTRICT`}</span><i>{active ? "ROOM OPEN // SCROLL DOSSIER" : "SWIPE THE MAP"}</i></div>
       <nav className="mobile-map-dock" aria-label="Command Center district navigation">
         {MOBILE_ZONES.map((zone) => <button key={zone.id} className={mobileZone === zone.label ? "is-active" : ""} onClick={() => travelTo(zone.x, zone.label)}><i>{zone.icon}</i><span>{zone.label}</span></button>)}
       </nav>
@@ -227,7 +228,7 @@ function RoomPanel({ room, onClose }: { room: Room; onClose: () => void }) {
       ) : (
         <div className="room-actions">{room.actions.map((action) => <button className={selectedAction === action ? "is-active" : ""} key={action} onClick={() => setSelectedAction(action)}><span>ACCESS</span>{action}<small>{selectedAction === action ? "SELECTED // PREVIEW READY" : "OPEN MODULE"}</small></button>)}</div>
       )}
-      <footer className="room-footer"><b>HOODEDHEROES PRIVATE NETWORK</b><span>PREVIEW MODE // NO LIVE TRANSACTIONS</span></footer>
+      <footer className="room-footer"><b>HOODED PRIVATE NETWORK</b><span>PREVIEW MODE // NO LIVE TRANSACTIONS</span></footer>
     </div>
   );
 }

@@ -10,7 +10,7 @@ importers:
 
   apps/score-service:
     dependencies:
-      '@hoodedheroes/game-engine':
+      '@hooded/game-engine':
         specifier: workspace:*
         version: link:../../packages/game-engine
     devDependencies:
@@ -26,16 +26,16 @@ importers:
 
   apps/web:
     dependencies:
-      '@hoodedheroes/game-engine':
+      '@hooded/game-engine':
         specifier: workspace:*
         version: link:../../packages/game-engine
-      '@hoodedheroes/score-service':
+      '@hooded/score-service':
         specifier: workspace:*
         version: link:../score-service
-      '@hoodedheroes/shared':
+      '@hooded/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@hoodedheroes/ui':
+      '@hooded/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@vercel/sandbox':

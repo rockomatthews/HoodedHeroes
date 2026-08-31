@@ -1,6 +1,6 @@
-# HoodedHeroes
+# HOODED
 
-HoodedHeroes is a comic-book-styled game, private builder society, isolated community sandbox, and tri-chain fair-launch system. The entry experience remains a fixed, no-scroll comic-cover composition based directly on the accepted concept art.
+HOODED is a comic-book-styled game, private builder society, isolated community sandbox, and tri-chain fair-launch system. The entry experience remains a fixed, no-scroll comic-cover composition based directly on the accepted concept art.
 
 ## Local development
 
@@ -15,7 +15,7 @@ The application opens in preview mode. The wallet control is deliberately simula
 
 - `apps/web`: Next.js entry portal, Command Center, Code Bazaar control plane, Launch Bay, public token pages, and guarded APIs.
 - `apps/score-service`: signed deterministic-score verification primitives.
-- `packages/contracts`: fixed-supply HERO/Genesis foundations plus the original pro-rata EVM fair-launch testnet candidate.
+- `packages/contracts`: fixed-supply HOODED/Genesis foundations plus the original pro-rata EVM fair-launch testnet candidate.
 - `packages/game-engine`: deterministic Power Grid seed, path validation, and score calculation.
 - `packages/shared` and `packages/ui`: product rules and reusable comic components.
 - `art/concepts`: three approved concept directions and their prompt record.
@@ -26,7 +26,7 @@ The application opens in preview mode. The wallet control is deliberately simula
 
 ## Community Sandbox and Launch Bay
 
-Copy `.env.example` to `.env.local` and configure only testnet infrastructure. The sandbox and transaction preparation are fail-closed; they remain unavailable until the database, verified HoodedHero gate, Vercel snapshots, and audited deployment addresses are present. See `docs/community-sandbox.md` and `docs/launch-bay-v1.md`.
+Copy `.env.example` to `.env.local` and configure only testnet infrastructure. The sandbox and transaction preparation are fail-closed; they remain unavailable until the database, verified Genesis Hero gate, Vercel snapshots, and audited deployment addresses are present. See `docs/community-sandbox.md` and `docs/launch-bay-v1.md`.
 
 Original source code is offered under AGPL-3.0-or-later. Competitor implementations with incompatible or source-restricted licenses must not be copied into this repository.
 
@@ -37,7 +37,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm --filter @hoodedheroes/contracts test
+pnpm --filter @hooded/contracts test
 ```
 
 ## Safety gates

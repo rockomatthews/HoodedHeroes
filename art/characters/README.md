@@ -1,6 +1,6 @@
 # Founding character set
 
-These five original HoodedHeroes were designed from the accepted entry-portal concept before the no-scroll interface was rebuilt.
+These five original Genesis Heroes were designed from the accepted entry-portal concept before the no-scroll interface was rebuilt.
 
 | Character | Palette | Signature power | Website asset |
 | --- | --- | --- | --- |

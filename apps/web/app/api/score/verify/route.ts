@@ -1,4 +1,4 @@
-import { verifyScore } from "@hoodedheroes/score-service";
+import { verifyScore } from "@hooded/score-service";
 
 export const runtime = "nodejs";
 

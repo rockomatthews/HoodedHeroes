@@ -1,5 +1,5 @@
 export type LaunchMode = "fixed" | "bonding";
-export type LegacyLaunchQuoteAsset = "ETH" | "HERO";
+export type LegacyLaunchQuoteAsset = "ETH" | "HOODED";
 
 export type LaunchProposal = {
   name: string;
@@ -32,7 +32,7 @@ export const DEFAULT_LAUNCH_PROPOSAL: LaunchProposal = {
   symbol: "SIGNAL",
   supply: 1_000_000_000,
   mode: "bonding",
-  quoteAsset: "HERO",
+  quoteAsset: "HOODED",
   creatorAllocationBps: 750,
   liquidityAllocationBps: 7000,
   vestingMonths: 12,

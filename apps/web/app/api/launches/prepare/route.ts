@@ -1,4 +1,4 @@
-import { validateLaunchManifest, type LaunchManifestV1 } from "@hoodedheroes/shared";
+import { validateLaunchManifest, type LaunchManifestV1 } from "@hooded/shared";
 
 export async function POST(request: Request) {
   const manifest = await request.json() as LaunchManifestV1;

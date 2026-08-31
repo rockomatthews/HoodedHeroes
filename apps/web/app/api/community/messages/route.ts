@@ -12,7 +12,7 @@ const messageSchema = z.object({ body: z.string().trim().min(1).max(280), channe
 
 async function requireHero() {
   const session = await getSocietySession();
-  if (!session || session.access !== "hero") throw new Response("A HoodedHero-gated session is required", { status: 403 });
+  if (!session || session.access !== "hero") throw new Response("A Genesis-Hero-gated session is required", { status: 403 });
   return session;
 }
 
@@ -20,7 +20,7 @@ function publicMessage(row: { id: string; owner_wallet: string; body: string; cr
   const wallet = row.owner_wallet;
   return {
     id: row.id,
-    author: `HERO ${wallet.slice(0, 6)}…${wallet.slice(-4)}`,
+    author: `HOODED ${wallet.slice(0, 6)}…${wallet.slice(-4)}`,
     body: row.body,
     createdAt: new Date(row.created_at).toISOString(),
   };
@@ -30,7 +30,7 @@ function publicActivity(row: { id: string; owner_wallet: string; channel: string
   const wallet = row.owner_wallet;
   return {
     id: `activity-${row.id}`,
-    actor: `HERO ${wallet.slice(0, 6)}…${wallet.slice(-4)}`,
+    actor: `HOODED ${wallet.slice(0, 6)}…${wallet.slice(-4)}`,
     action: "sent a Community Signal",
     channel: row.channel.replaceAll("-", " ").toUpperCase(),
     createdAt: new Date(row.created_at).toISOString(),

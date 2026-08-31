@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("the comic-cover entry portal never scrolls", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /hooded heroes/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "HOODED", exact: true })).toBeVisible();
   await expect(page.getByText("3,000", { exact: true })).toBeVisible();
   const dimensions = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight }));
   expect(dimensions.width).toBeLessThanOrEqual(dimensions.viewportWidth);
@@ -26,11 +26,19 @@ test("wallet preview state is clearly simulated", async ({ page }) => {
   await expect(page.getByText(/preview clearance/i)).toBeVisible();
 });
 
+test("the public genesis vestibule uses the HOODED token identity", async ({ page }) => {
+  await page.goto("/launch/hooded-genesis");
+  await expect(page).toHaveTitle("HOODED (HOODED) — HOODED Launch Bay");
+  await expect(page.getByRole("heading", { level: 1, name: "HOODED" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "$HOODED" })).toBeVisible();
+  await expect(page.getByText("25,000 HOODED unlocks society preview")).toBeVisible();
+});
+
 test("mobile Command Center uses a zoomed comic district rail", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Mobile navigation only");
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
-  const viewport = page.getByRole("region", { name: "HoodedHeroes Command Center" });
+  const viewport = page.getByRole("region", { name: "HOODED Command Center" });
   const districtRail = page.getByRole("navigation", { name: "Command Center district navigation" });
   await expect(districtRail).toBeVisible();
   await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(300);
@@ -50,15 +58,15 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
   test.skip(testInfo.project.name === "mobile-chrome", "Mobile navigation is covered by the district-rail flow");
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
-  await expect(page.getByRole("region", { name: "HoodedHeroes Command Center" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "HOODED Command Center" })).toBeVisible();
   const dimensions = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight }));
   expect(dimensions.width).toBeLessThanOrEqual(dimensions.viewportWidth);
   expect(dimensions.height).toBeLessThanOrEqual(dimensions.viewportHeight);
 
-  await expect(page.getByRole("button", { name: "Open Community Signal and HoodedHeroes Creed" })).toBeVisible();
-  await page.getByRole("button", { name: "Open Community Signal and HoodedHeroes Creed" }).click();
+  await expect(page.getByRole("button", { name: "Open Community Signal and HOODED Creed" })).toBeVisible();
+  await page.getByRole("button", { name: "Open Community Signal and HOODED Creed" }).click();
   await expect(page.getByRole("dialog", { name: "Community Signal panel" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "The HoodedHeroes Creed" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "The HOODED Creed" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Community Signal live chat" })).toBeVisible();
   await expect(page.getByText("Every utility bearing our crest is built, tested, and forever improved by the community.")).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Community Signal channels" })).toBeVisible();

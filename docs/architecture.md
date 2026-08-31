@@ -21,10 +21,10 @@ The browser is never authoritative for score, wallet balance, ownership, rank, o
 | State | Access |
 | --- | --- |
 | Public | Vestibule, disclosures, verified contract links, acquisition and mint guidance |
-| Holds 25,000 HERO | Preview lobby |
-| Owns a HoodedHero | Missions, Code Bazaar, Assembly, Launch Bay |
+| Holds 25,000 HOODED | Preview lobby |
+| Owns a Genesis Hero | Missions, Code Bazaar, Assembly, Launch Bay |
 
-The production SIWE callback must snapshot both token balance and NFT ownership from Robinhood Chain. NFT ownership is the durable membership check, so a member remains admitted after spending HERO to mint. Transfers trigger an on-chain progression-reset event; the indexer applies the reset to earned progression.
+The production SIWE callback must snapshot both token balance and NFT ownership from Robinhood Chain. NFT ownership is the durable membership check, so a member remains admitted after spending HOODED to mint. Transfers trigger an on-chain progression-reset event; the indexer applies the reset to earned progression.
 
 ## Deployment boundaries
 

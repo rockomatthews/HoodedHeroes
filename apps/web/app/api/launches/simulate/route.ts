@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { simulateProRataLaunch } from "@hoodedheroes/shared";
+import { simulateProRataLaunch } from "@hooded/shared";
 import { publicError } from "@/lib/server/request-security";
 
 const schema = z.object({

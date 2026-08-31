@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { HERO_GENESIS_MANIFEST, HERO_PREVIEW_THRESHOLD, buildMetaplexMetadata, evaluateSocietyAccess, simulateProRataLaunch, validateLaunchManifest } from "@hoodedheroes/shared";
+import { HOODED_GENESIS_MANIFEST, HOODED_PREVIEW_THRESHOLD, buildMetaplexMetadata, evaluateSocietyAccess, simulateProRataLaunch, validateLaunchManifest } from "@hooded/shared";
 
 describe("LaunchManifestV1", () => {
-  it("accepts the bundled HERO testnet genesis manifest", () => {
-    const result = validateLaunchManifest(HERO_GENESIS_MANIFEST);
+  it("accepts the bundled HOODED testnet genesis manifest", () => {
+    const result = validateLaunchManifest(HOODED_GENESIS_MANIFEST);
     expect(result.ready).toBe(true);
     expect(result.passed).toBe(12);
   });
 
   it("blocks fee, authority, and allocation escapes", () => {
-    const manifest = structuredClone(HERO_GENESIS_MANIFEST);
+    const manifest = structuredClone(HOODED_GENESIS_MANIFEST);
     manifest.fees.saleFeeBps = 101;
     manifest.metadata.authorities.futureMint = true as false;
     manifest.sale.creatorAllocationBps = 1_500;
@@ -26,17 +26,17 @@ describe("LaunchManifestV1", () => {
   });
 
   it("builds Metaplex distribution metadata from the same canonical source", () => {
-    const payload = buildMetaplexMetadata(HERO_GENESIS_MANIFEST.metadata);
-    expect(payload.symbol).toBe("HERO");
-    expect(payload.image).toBe(HERO_GENESIS_MANIFEST.metadata.publication.image);
+    const payload = buildMetaplexMetadata(HOODED_GENESIS_MANIFEST.metadata);
+    expect(payload.symbol).toBe("HOODED");
+    expect(payload.image).toBe(HOODED_GENESIS_MANIFEST.metadata.publication.image);
     expect(payload.attributes).toEqual(expect.arrayContaining([expect.objectContaining({ trait_type: "Build Hash" })]));
   });
 });
 
 describe("society gate", () => {
-  it("requires 25,000 HERO for preview and a Genesis NFT for builder access", () => {
-    expect(evaluateSocietyAccess({ heroBalance: HERO_PREVIEW_THRESHOLD - 1n, genesisHeroBalance: 0n })).toBe("vestibule");
-    expect(evaluateSocietyAccess({ heroBalance: HERO_PREVIEW_THRESHOLD, genesisHeroBalance: 0n })).toBe("preview");
-    expect(evaluateSocietyAccess({ heroBalance: 0n, genesisHeroBalance: 1n })).toBe("hero");
+  it("requires 25,000 HOODED for preview and a Genesis NFT for builder access", () => {
+    expect(evaluateSocietyAccess({ hoodedBalance: HOODED_PREVIEW_THRESHOLD - 1n, genesisHeroBalance: 0n })).toBe("vestibule");
+    expect(evaluateSocietyAccess({ hoodedBalance: HOODED_PREVIEW_THRESHOLD, genesisHeroBalance: 0n })).toBe("preview");
+    expect(evaluateSocietyAccess({ hoodedBalance: 0n, genesisHeroBalance: 1n })).toBe("hero");
   });
 });

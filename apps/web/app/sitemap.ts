@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hoodedheroes.example";
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hooded.example";
   return [
     { url: origin, changeFrequency: "weekly", priority: 1 },
-    { url: `${origin}/launch/hoodedheroes-hero-genesis`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${origin}/launch/hooded-genesis`, changeFrequency: "daily", priority: 0.9 },
   ];
 }

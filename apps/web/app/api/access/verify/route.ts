@@ -20,11 +20,11 @@ export async function POST(request: Request) {
     const evidence = await readWalletAccess(wallet);
     if (databaseConfigured()) {
       const sql = db();
-      await sql`insert into society_members (wallet_address, access_level, hero_balance, genesis_hero_balance, last_verified_at) values (${wallet.toLowerCase()}, ${evidence.access}, ${evidence.heroBalance.toString()}, ${evidence.genesisHeroBalance.toString()}, now()) on conflict (wallet_address) do update set access_level = excluded.access_level, hero_balance = excluded.hero_balance, genesis_hero_balance = excluded.genesis_hero_balance, last_verified_at = now()`;
+      await sql`insert into society_members (wallet_address, access_level, hooded_balance, genesis_hero_balance, last_verified_at) values (${wallet.toLowerCase()}, ${evidence.access}, ${evidence.hoodedBalance.toString()}, ${evidence.genesisHeroBalance.toString()}, now()) on conflict (wallet_address) do update set access_level = excluded.access_level, hooded_balance = excluded.hooded_balance, genesis_hero_balance = excluded.genesis_hero_balance, last_verified_at = now()`;
     }
     await createSocietySession({ wallet, access: evidence.access });
     await consumeChallenge();
-    return Response.json({ wallet, access: evidence.access, heroBalance: evidence.heroBalance.toString(), genesisHeroBalance: evidence.genesisHeroBalance.toString() });
+    return Response.json({ wallet, access: evidence.access, hoodedBalance: evidence.hoodedBalance.toString(), genesisHeroBalance: evidence.genesisHeroBalance.toString() });
   } catch (error) {
     return publicError(error);
   }

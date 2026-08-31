@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { HERO_GENESIS_MANIFEST, buildDexScreenerProfile, buildMetaplexMetadata, buildUniswapTokenList, simulateProRataLaunch, validateLaunchManifest, type LaunchChain, type LaunchManifestV1 } from "@hoodedheroes/shared";
+import { HOODED_GENESIS_MANIFEST, buildDexScreenerProfile, buildMetaplexMetadata, buildUniswapTokenList, simulateProRataLaunch, validateLaunchManifest, type LaunchChain, type LaunchManifestV1 } from "@hooded/shared";
 
 const CHAINS: { id: LaunchChain; label: string; status: string; color: string }[] = [
   { id: "robinhood", label: "RH CHAIN", status: "EVM TESTNET", color: "green" },
@@ -10,11 +10,11 @@ const CHAINS: { id: LaunchChain; label: string; status: string; color: string }[
 ];
 
 function initialManifest(): LaunchManifestV1 {
-  const manifest = JSON.parse(JSON.stringify(HERO_GENESIS_MANIFEST)) as LaunchManifestV1;
+  const manifest = JSON.parse(JSON.stringify(HOODED_GENESIS_MANIFEST)) as LaunchManifestV1;
   manifest.metadata.projectId = "night-signal-testnet";
   manifest.metadata.name = "Night Signal";
   manifest.metadata.symbol = "SIGNAL";
-  manifest.metadata.publication.summary = "A community-built signal token launched through the HoodedHeroes society.";
+  manifest.metadata.publication.summary = "A community-built signal token launched through the HOODED society.";
   manifest.metadata.publication.description = "Night Signal demonstrates fixed supply, pro-rata allocation, versioned metadata, transparent fees, and permanently locked liquidity.";
   manifest.metadata.publication.utility = "Community coordination and testnet launch-system validation.";
   return manifest;

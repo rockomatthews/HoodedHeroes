@@ -1,10 +1,10 @@
-# HoodedHeroes concept direction
+# HOODED concept direction
 
 ## Accepted versions
 
 | Screen | Accepted file | Status |
 | --- | --- | --- |
-| Entry portal | `01-hoodedheroes-entry.png` | Accepted v1 |
+| Entry portal | `01-hooded-entry.png` | Accepted v1 |
 | Command center | `02-secret-command-center.png` | Accepted v1 |
 | Power Grid | `03-power-grid-mission.png` | Accepted v1 |
 
@@ -26,7 +26,7 @@ Use a condensed, italic display face for action headlines and a legible grotesk 
 
 ### Entry portal
 
-Modern pop-comic desktop landing page for **HOODED HEROES**, with five original hooded silhouettes, a concealed headquarters doorway, black background, saturated four-color power panels, wallet entry actions, and a 3,000 genesis hero scarcity counter.
+Modern pop-comic desktop landing page for **HOODED**, with five original hooded silhouettes, a concealed headquarters doorway, black background, saturated four-color power panels, wallet entry actions, and a 3,000 genesis hero scarcity counter.
 
 ### Secret command center
 

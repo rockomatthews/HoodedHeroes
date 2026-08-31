@@ -16,14 +16,14 @@ type Hero = {
 };
 
 const HEROES: Hero[] = [
-  { name: "Inferno", codename: "HH-001", color: "red", image: "/heroes/inferno.png", power: "Thermal Forge", role: "Vanguard", quote: "Pressure makes the legend." },
-  { name: "Volt", codename: "HH-002", color: "blue", image: "/heroes/volt.png", power: "Arc Relay", role: "Specialist", quote: "Every system has a current." },
-  { name: "Pulse", codename: "HH-003", color: "green", image: "/heroes/pulse.png", power: "Kinetic Field", role: "Operative", quote: "Move the city. Move together." },
-  { name: "Circuit", codename: "HH-004", color: "yellow", image: "/heroes/circuit.png", power: "Hard-Light Grid", role: "Engineer", quote: "Build what the night needs." },
-  { name: "Phantom", codename: "HH-005", color: "paper", image: "/heroes/phantom.png", power: "Signal Veil", role: "Tactician", quote: "The best door is the one unseen." },
+  { name: "Inferno", codename: "H-001", color: "red", image: "/heroes/inferno.png", power: "Thermal Forge", role: "Vanguard", quote: "Pressure makes the legend." },
+  { name: "Volt", codename: "H-002", color: "blue", image: "/heroes/volt.png", power: "Arc Relay", role: "Specialist", quote: "Every system has a current." },
+  { name: "Pulse", codename: "H-003", color: "green", image: "/heroes/pulse.png", power: "Kinetic Field", role: "Operative", quote: "Move the city. Move together." },
+  { name: "Circuit", codename: "H-004", color: "yellow", image: "/heroes/circuit.png", power: "Hard-Light Grid", role: "Engineer", quote: "Build what the night needs." },
+  { name: "Phantom", codename: "H-005", color: "paper", image: "/heroes/phantom.png", power: "Signal Veil", role: "Tactician", quote: "The best door is the one unseen." },
 ];
 
-export function HoodedHeroesExperience() {
+export function HoodedExperience() {
   const [connected, setConnected] = useState(false);
   const [selectedHero, setSelectedHero] = useState<Hero | null>(null);
   const [inCommandCenter, setInCommandCenter] = useState(false);
@@ -37,20 +37,20 @@ export function HoodedHeroesExperience() {
       <div className="comic-cover">
         <div className="paper-grain" />
         <header className="cover-nav">
-          <button className="nav-hood" aria-label="HoodedHeroes home" onClick={() => setSelectedHero(null)}><Image src="/brand/hoodedheroes-coin-emblem.png" alt="" fill sizes="6vw" priority /></button>
+          <button className="nav-hood" aria-label="HOODED home" onClick={() => setSelectedHero(null)}><Image src="/brand/hooded-coin-emblem.png" alt="" fill sizes="6vw" priority /></button>
         </header>
 
         <section className="cover-copy" aria-labelledby="cover-title">
           <div className="cover-mark"><span className="cover-mark__hood" /><i /><i /><i /></div>
-          <h1 id="cover-title"><span>Hooded</span><span>Heroes</span></h1>
+          <h1 id="cover-title"><span>HOODED</span></h1>
           <div className="cover-tagline">Enter the society.<br />Build the next legend.</div>
         </section>
 
-        <section className="hero-panels" aria-label="Meet the founding HoodedHeroes">
+        <section className="hero-panels" aria-label="Meet the founding Heroes">
           {HEROES.map((hero, index) => (
             <button className={`hero-panel hero-panel--${hero.color}`} key={hero.name} onClick={() => setSelectedHero(hero)} aria-label={`Meet ${hero.name}`}>
               <span className="panel-burst" />
-              <Image src={hero.image} alt={`${hero.name}, an original HoodedHero`} fill sizes="22vw" priority={index < 3} />
+              <Image src={hero.image} alt={`${hero.name}, an original HOODED Genesis Hero`} fill sizes="22vw" priority={index < 3} />
               <span className="hero-label"><small>{hero.codename}</small><strong>{hero.name}</strong></span>
             </button>
           ))}
@@ -64,11 +64,11 @@ export function HoodedHeroesExperience() {
 
         <button className={`wallet-card ${connected ? "wallet-card--connected" : ""}`} onClick={() => setConnected((value) => !value)}>
           <span className="wallet-icon"><i /></span>
-          <span className="wallet-copy"><strong>{connected ? "WALLET CONNECTED" : "CONNECT WALLET"}</strong><small>{connected ? "PREVIEW CLEARANCE // 0x7A2…91F" : "ENTER WITH 25,000 HERO"}</small></span>
+          <span className="wallet-copy"><strong>{connected ? "WALLET CONNECTED" : "CONNECT WALLET"}</strong><small>{connected ? "PREVIEW CLEARANCE // 0x7A2…91F" : "ENTER WITH 25,000 $HOODED"}</small></span>
         </button>
 
         <div className="genesis-counter"><span className="mini-hoods"><i /><i /><i /></span><b /><div><strong>3,000</strong><small>Genesis Heroes</small></div></div>
-        <Link className="genesis-launch-link" href="/launch/hoodedheroes-hero-genesis"><span>$HERO GENESIS</span><b>VIEW PUBLIC VESTIBULE →</b></Link>
+        <Link className="genesis-launch-link" href="/launch/hooded-genesis"><span>$HOODED GENESIS</span><b>VIEW PUBLIC VESTIBULE →</b></Link>
         <div className="corner-copy">ROBINHOOD CHAIN // SEASON 00 // PROTOTYPE</div>
 
         {selectedHero && (

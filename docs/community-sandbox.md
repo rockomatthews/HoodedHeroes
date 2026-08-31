@@ -1,12 +1,12 @@
-# HoodedHeroes community sandbox
+# HOODED community sandbox
 
 The Code Bazaar control plane is implemented with `@vercel/sandbox`, but it is fail-closed by default. It cannot create a microVM until all of the following are true:
 
 1. `ENABLE_VERCEL_SANDBOX=true` is set server-side.
 2. Vercel OIDC or explicitly authorized local Vercel credentials are available.
-3. PostgreSQL contains a currently verified HoodedHero member.
+3. PostgreSQL contains a currently verified Genesis Hero member.
 4. The request has a signed, unexpired society session, same-origin headers, and an idempotency key.
-5. The repository is exactly `rockomatthews/HoodedHeroes` and `SANDBOX_BASE_COMMIT` is a reviewed full commit hash.
+5. The repository is exactly `rockomatthews/HOODED` and `SANDBOX_BASE_COMMIT` is a reviewed full commit hash.
 
 ## Runtime images
 
@@ -25,8 +25,8 @@ PostgreSQL stores sessions, run evidence, proposal state, and review attestation
 
 - Apply `docs/schema.sql` to a non-production database and test row-level ownership checks.
 - Create the Vercel snapshots and record their tool manifests and SHA-256 build hashes.
-- Set the RH testnet RPC, `$HERO`, and Genesis NFT addresses.
+- Set the RH testnet RPC, `$HOODED`, and Genesis NFT addresses.
 - Set `SANDBOX_BASE_COMMIT` to the full SHA of the reviewed protected-branch revision.
 - Use a 32+ character random `SOCIETY_SESSION_SECRET`.
 - Verify sandbox egress denial, resource limits, cross-user denial, expiration, and idempotent retries.
-- Run a closed HoodedHero exercise before enabling the feature flag in production.
+- Run a closed Genesis Hero exercise before enabling the feature flag in production.

@@ -12,7 +12,7 @@ Launch Bay is the first utility produced through Code Bazaar. It connects one ma
 - [[02 - System Map]]
 - [[03 - Security and Release Gates]]
 - [[04 - Decision Log]]
-- [[../HERO/00 - HERO Genesis Index|HERO Genesis]]
+- [[../HOODED/00 - HOODED Genesis Index|HOODED Genesis]]
 
 ## Current release order
 
@@ -22,4 +22,3 @@ Launch Bay is the first utility produced through Code Bazaar. It connects one ma
 4. Run closed adversarial review.
 5. Seek independent EVM audits and legal review.
 6. Build and independently audit the Solana program and Raydium path.
-

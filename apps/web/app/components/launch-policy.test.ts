@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LAUNCH_PROPOSAL, validateLaunchProposal } from "@hoodedheroes/shared";
+import { DEFAULT_LAUNCH_PROPOSAL, validateLaunchProposal } from "@hooded/shared";
 
-describe("HoodedHeroes Launch Bay policy", () => {
+describe("HOODED Launch Bay policy", () => {
   it("accepts the audited fixed-supply template defaults", () => {
     const result = validateLaunchProposal(DEFAULT_LAUNCH_PROPOSAL);
     expect(result.ready).toBe(true);

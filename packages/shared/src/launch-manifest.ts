@@ -1,6 +1,6 @@
 export type LaunchChain = "robinhood" | "base" | "solana";
 export type LaunchEnvironment = "testnet" | "mainnet-candidate";
-export type LaunchQuoteAsset = "ETH" | "SOL" | "USDC" | "USDG" | "HERO";
+export type LaunchQuoteAsset = "ETH" | "SOL" | "USDC" | "USDG" | "HOODED";
 export type LaunchLifecycle =
   | "draft"
   | "metadata-validated"
@@ -101,7 +101,7 @@ export type LaunchManifestV1 = {
 export type ManifestCheck = { id: string; label: string; passed: boolean; detail: string };
 
 const CHAIN_QUOTES: Record<LaunchChain, readonly LaunchQuoteAsset[]> = {
-  robinhood: ["ETH", "USDG", "HERO"],
+  robinhood: ["ETH", "USDG", "HOODED"],
   base: ["ETH", "USDC"],
   solana: ["SOL", "USDC"],
 };
@@ -141,30 +141,30 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
   return { checks, ready: checks.every((check) => check.passed), passed: checks.filter((check) => check.passed).length, total: checks.length };
 }
 
-export const HERO_GENESIS_MANIFEST: LaunchManifestV1 = {
+export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
   manifestVersion: "1.0.0",
   environment: "testnet",
   lifecycle: "draft",
   metadata: {
     schemaVersion: "1.0.0",
-    projectId: "hoodedheroes-hero-genesis",
+    projectId: "hooded-genesis",
     chain: "robinhood",
-    name: "HoodedHeroes",
-    symbol: "HERO",
+    name: "HOODED",
+    symbol: "HOODED",
     decimals: 18,
     exactSupply: "1000000000000000000000000000",
     creatorWallet: "0x0000000000000000000000000000000000000000",
     sourceCommit: "0000000",
     buildHash: "0".repeat(64),
     license: "AGPL-3.0-or-later",
-    canonicalLaunchUrl: "https://hoodedheroes.example/launch/hero",
+    canonicalLaunchUrl: "https://hooded.example/launch/hooded-genesis",
     authorities: { futureMint: false, freeze: false, blacklist: false, mutableTax: false, arbitraryUpgrade: false },
     publication: {
-      summary: "The fixed-supply access and utility token for the HoodedHeroes society.",
-      description: "HERO powers access, genesis hero minting, community rewards, and transparent governance across HoodedHeroes.",
-      utility: "Society access, Genesis HoodedHero minting, seasonal rewards, and governance participation.",
+      summary: "The fixed-supply access and utility token for the HOODED society.",
+      description: "HOODED powers access, Genesis Hero minting, community rewards, and transparent governance across the society.",
+      utility: "Society access, Genesis Hero minting, seasonal rewards, and governance participation.",
       categories: ["community", "gaming", "developer-tools"],
-      website: "https://hoodedheroes.example",
+      website: "https://hooded.example",
       riskDisclosure: "Digital assets are risky and may lose all value. No return, liquidity, or listing is promised.",
       jurisdictionNotice: "Availability depends on applicable law, sanctions screening, and jurisdiction controls.",
       teamDisclosure: "pseudonymous",

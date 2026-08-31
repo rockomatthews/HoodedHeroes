@@ -46,7 +46,7 @@ create table stock_token_eligibility (
 create table society_members (
   wallet_address text primary key,
   access_level text not null check (access_level in ('vestibule', 'preview', 'hero')),
-  hero_balance numeric(78, 0) not null default 0,
+  hooded_balance numeric(78, 0) not null default 0,
   genesis_hero_balance numeric(78, 0) not null default 0,
   reputation integer not null default 0 check (reputation >= 0),
   last_verified_at timestamptz not null,
@@ -57,7 +57,7 @@ create table sandbox_sessions (
   id uuid primary key,
   idempotency_key text not null,
   owner_wallet text not null references society_members(wallet_address),
-  repository text not null check (repository = 'rockomatthews/HoodedHeroes'),
+  repository text not null check (repository = 'rockomatthews/HOODED'),
   base_commit text not null check (base_commit ~ '^[a-fA-F0-9]{7,40}$'),
   runtime_image text not null check (runtime_image in ('web-evm-v1', 'solana-v1')),
   provider_session_id text not null unique,

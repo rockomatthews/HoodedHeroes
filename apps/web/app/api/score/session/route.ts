@@ -1,4 +1,4 @@
-import { issueScoreSession } from "@hoodedheroes/score-service";
+import { issueScoreSession } from "@hooded/score-service";
 
 export const runtime = "nodejs";
 

@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { createRound, scorePath, validatePath, type Cell } from "@hoodedheroes/game-engine";
+import { createRound, scorePath, validatePath, type Cell } from "@hooded/game-engine";
 
 export type ScoreSession = { wallet: string; seed: number; nonce: string; issuedAt: number; expiresAt: number };
 export type SignedSession = { session: ScoreSession; signature: string };

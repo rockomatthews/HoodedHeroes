@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
-import type { SocietyAccess } from "@hoodedheroes/shared";
+import type { SocietyAccess } from "@hooded/shared";
 
 const SESSION_COOKIE = "hh_society_session";
 const CHALLENGE_COOKIE = "hh_wallet_challenge";
@@ -57,7 +57,7 @@ export async function consumeChallenge() {
 
 export function challengeMessage(challenge: ChallengePayload, wallet: string) {
   return [
-    "HOODED HEROES SOCIETY ACCESS",
+    "HOODED SOCIETY ACCESS",
     "Sign this message to prove wallet control. This does not authorize a transaction.",
     `Wallet: ${wallet.toLowerCase()}`,
     `Origin: ${challenge.origin}`,
