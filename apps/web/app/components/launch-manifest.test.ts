@@ -19,7 +19,7 @@ describe("LaunchManifestV1", () => {
     sealMetadata(manifest);
     const result = validateLaunchManifest(manifest);
     expect(result.ready).toBe(true);
-    expect(result.passed).toBe(14);
+    expect(result.passed).toBe(15);
   });
 
   it("keeps placeholder metadata and build evidence out of canary-ready state", () => {

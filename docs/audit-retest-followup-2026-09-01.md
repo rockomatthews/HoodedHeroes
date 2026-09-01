@@ -1,5 +1,7 @@
 # Launch Bay remediation-retest follow-up
 
+> Superseded for deployment review by `docs/audit-followup-remediation-2026-09-01.md`. The M-1 sizing gate described below remains correct for accrued quote, but the auditor found H-5 because the coordinator previously sized from raw native balance. No deployment is authorized.
+
 The independent retest of commit `3a23535db3e287225e1daaff58f737e101a5e73b` closed C-1 and H-1 through H-4, confirmed no new Critical or High issue, and classified M-1, M-2, and L-1 as partially fixed. This v1.3 follow-up addresses those residuals. It is a retest candidate, not deployment approval.
 
 ## Residual remediation

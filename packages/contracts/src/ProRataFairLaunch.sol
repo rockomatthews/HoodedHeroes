@@ -68,6 +68,7 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
     event Refunded(address indexed contributor, uint256 amount);
     event QuoteAccrued(address indexed recipient, uint256 amount);
     event QuoteWithdrawn(address indexed recipient, uint256 amount);
+    event ExpiredLiquidityQuoteRedirected(address indexed proceedsRecipient, uint256 amount);
     event PauseChanged(bool paused);
     event Cancelled();
     event UnsoldSwept(uint256 amount, address indexed recipient);
@@ -271,6 +272,19 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
         quoteLiability -= amount;
         _payQuote(msg.sender, amount);
         emit QuoteWithdrawn(msg.sender, amount);
+    }
+
+    /// @notice After the claim window, the liquidity coordinator may redirect an
+    /// unfinalized liquidity accrual to the immutable DAO proceeds recipient.
+    /// @dev Quote never leaves the pull-payment ledger and total liability is unchanged.
+    function redirectExpiredLiquidityQuoteToProceeds() external returns (uint256 amount) {
+        require(msg.sender == liquidityRecipient, "not liquidity recipient");
+        require(block.timestamp > claimDeadline, "claims active");
+        amount = claimableQuote[msg.sender];
+        if (amount == 0) return 0;
+        claimableQuote[msg.sender] = 0;
+        claimableQuote[proceedsRecipient] += amount;
+        emit ExpiredLiquidityQuoteRedirected(proceedsRecipient, amount);
     }
 
     function setPaused(bool value) external {

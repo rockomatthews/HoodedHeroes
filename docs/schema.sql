@@ -140,6 +140,7 @@ create table launches (
   lifecycle text not null,
   token_address text,
   sale_address text,
+  factory_address text,
   manifest jsonb not null,
   manifest_hash text not null unique,
   created_at timestamptz not null default now(),
@@ -212,10 +213,28 @@ create table liquidity_positions (
   lock_address text not null,
   position_manager text not null,
   position_id numeric(78, 0),
+  token_address text,
+  quote_token_address text,
+  venue_identifier text,
+  pool_id text,
+  fee integer,
+  tick_spacing integer,
+  hook_address text,
+  finalization_transaction_hash text,
   quote_amount numeric(78, 0) not null default 0,
   token_amount numeric(78, 0) not null default 0,
   permanently_locked boolean not null default false,
   verified_at timestamptz
+);
+
+create table launch_provider_readiness (
+  project_id text not null references launches(project_id),
+  provider text not null check (provider in ('mancer', 'lifi')),
+  status text not null default 'unverified' check (status in ('unverified', 'confirmed', 'rejected')),
+  evidence_url text,
+  confirmed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (project_id, provider)
 );
 
 create table distribution_artifacts (

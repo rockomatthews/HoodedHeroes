@@ -1,17 +1,20 @@
 # Launch Bay v1 implementation
 
-Launch Bay v1.3 is a fixed-price, timed, pro-rata fair-launch remediation candidate for Robinhood Chain. The versioned launch manifest drives UI validation, simulation, metadata, APIs, and contract configuration. HOODED does not use public testnets: evidence comes from local tests, mainnet forks, unsigned simulations, two owner-only lab launches, and independent review.
+Launch Bay v1.4 is a fixed-price, timed, pro-rata fair-launch integration candidate for Robinhood Chain. The versioned launch manifest drives UI validation, simulation, metadata, APIs, and contract configuration. HOODED does not use public testnets: evidence comes from local tests, mainnet forks, unsigned simulations, two owner-only lab launches, and independent review.
 
 ## Implemented foundations
 
-- Fourteen deterministic manifest gates, including launch classification, a bound creator, fixed supply, exact allocation conservation, approved quote assets, 1% fee cap, a published Hero reward vault, immutable authority flags, production liquidity or lab no-pool enforcement, EIP-712 contribution eligibility, metadata completeness, reproducible source hashes, and sealed execution.
+- Fifteen deterministic manifest gates, including the canonical Hooded launcher identity, launch classification, a bound creator, fixed supply, exact allocation conservation, approved quote assets, 1% fee cap, a published Hero reward vault, immutable authority flags, production liquidity or lab no-pool enforcement, EIP-712 contribution eligibility, metadata completeness, reproducible source hashes, and sealed execution.
 - Shared pro-rata allocation simulator with integer rounding equivalent to the EVM contract.
 - Metaplex, Uniswap Token List, and DEX Screener payload generation from one versioned metadata record.
 - Public launch list/detail/validation/simulation endpoints.
 - Signed-wallet owner-gated canary persistence and a fail-closed transaction-preparation endpoint.
 - Burnable `FixedSupplyLaunchToken`, owner-only `LaunchFactory`, Safe-approved `ProductionLaunchFactory`, `ProRataFairLaunch`, `RobinhoodLiquidityCoordinator`, ownerless position receiver, and immutable referral registry.
+- Canonical pool readback stored by the coordinator and emitted through `CanonicalPoolActivated`, including manifest, assets, venue, pool ID, fee, tick spacing, hook, position ID, and permanent lock.
 - Production approvals and participant eligibility are EIP-712 signatures bound to chain, contract, wallet, manifest, nonce, allowance, and expiration. Claims and refunds never require eligibility approval.
 - Accepted quote is split during settlement. For HOODED, 37.5% enters the liquidity coordinator, the disclosed fee follows its immutable split, and the remainder accrues to the DAO timelock.
+- Liquidity finalization sizes exclusively from quote accrued to the coordinator in the sale ledger. Forced or pre-funded native balance is never included in price or token sizing.
+- A launch must have a future sale end when the factory creates it, so community vesting cannot begin in the past. If successful liquidity remains unfinalized after the claim deadline, anyone may burn the unused liquidity allocation and redirect its accrued quote inside the pull-payment ledger to the immutable DAO proceeds recipient.
 - Permissionless failed-launch refunds, oversubscription refunds, incident-pause-to-refund behavior, settlement on behalf of inactive contributors, immutable recipients, and no owner withdrawal. Quote proceeds, fees, and refunds use recipient-owned pull balances, so a recipient that rejects ETH cannot block anyone else's settlement. Unsold tokens cannot move until every contribution has settled.
 - Owner-only unsigned creation and activation preparation routes with exact factory/sale bytecode checks, immutable-owner readback, manifest-hash checks, gas estimation, and required mainnet `eth_call` simulation.
 - Launch preparation requires the manifest reward recipient, submitted execution recipient, and server-configured chain reward vault to match exactly. The reward vault can permissionlessly pull its accrued sale-fee balance into a new equal-per-Hero round; native fees are wrapped before accounting.
@@ -42,6 +45,8 @@ After setting `LAUNCH_CANARY_OWNER_ADDRESS`, run `pnpm canary:factory-plan:rh` t
 Run `pnpm canary:evidence` to rebuild the Solidity suite and print a reproducible evidence record containing the source commit, compiler settings, ABI hashes, bytecode hashes, and byte sizes. Use `node scripts/canary-build-evidence.mjs --require-clean` for release evidence.
 
 The current Slither review leaves explicit findings for intentional timestamp windows, the caller-only native-asset withdrawal, exact fixed-supply allocation conservation, low-level referral-registry detection, OpenZeppelin pragma variation, the constructor-bound wrapped-native deposit, and conservative reentrancy heuristics around guarded fee harvesting. The pull-payment design has a hostile-recipient regression test; the harvester requires the immutable recipient, matching quote asset, exact accrued/withdrawn amount, post-transfer balance reconciliation, and a reentrancy guard. These findings require independent auditor review before a mainnet signature; static analysis is not an audit.
+
+The real Robinhood Uniswap v4 adapter remains intentionally unimplemented. The coordinator validates a typed descriptor and declared callback/price gates, but those declarations are not self-certifying. The final adapter must independently prove PoolManager-only callbacks, initial-price correctness, existing-pool price-mismatch rejection, slippage protection, Permit2 cleanup, and permanent position receipt before deployment.
 
 ## Metadata cost discipline
 

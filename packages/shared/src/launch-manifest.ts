@@ -15,7 +15,8 @@ export type LaunchLifecycle =
   | "public-eligible";
 
 export type LaunchMetadataV1 = {
-  schemaVersion: "1.3.0";
+  schemaVersion: "1.4.0";
+  launcher: "Hooded";
   projectId: string;
   chain: LaunchChain;
   tokenAddress?: string;
@@ -27,7 +28,7 @@ export type LaunchMetadataV1 = {
   sourceCommit: string;
   buildHash: string;
   immutableCoreHash: string;
-  factoryVersion: "1.3.0";
+  factoryVersion: "1.4.0";
   license: "AGPL-3.0-or-later";
   canonicalLaunchUrl: string;
   explorerUrl?: string;
@@ -69,7 +70,7 @@ export type LaunchMetadataV1 = {
 };
 
 export type LaunchManifestV1 = {
-  manifestVersion: "1.3.0";
+  manifestVersion: "1.4.0";
   environment: LaunchEnvironment;
   launchClass: LaunchClass;
   lifecycle: LaunchLifecycle;
@@ -190,6 +191,7 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
     && (BigInt(metadata.exactSupply) * BigInt(sale.saleAllocationBps) / 10_000n) * BigInt(sale.pricePerToken) / 10n ** 18n === BigInt(sale.maximumRaise)
   );
   const checks: ManifestCheck[] = [
+    { id: "launcher", label: "Canonical launcher", passed: metadata.launcher === "Hooded", detail: "Every launch must identify Hooded as its canonical launcher." },
     { id: "identity", label: "Canonical identity", passed: metadata.name.trim().length >= 2 && /^[A-Z0-9]{2,10}$/.test(metadata.symbol), detail: "Name is required and symbol must contain 2–10 uppercase letters or numbers." },
     { id: "creator", label: "Bound canary creator", passed: /^0x[a-fA-F0-9]{40}$/.test(metadata.creatorWallet) && !/^0x0{40}$/i.test(metadata.creatorWallet), detail: "The manifest must bind one nonzero EVM creator wallet; the server and factory independently enforce the same address." },
     { id: "supply", label: "Exact fixed supply", passed: isIntegerString(metadata.exactSupply) && BigInt(metadata.exactSupply) > 0n && immutableAuthorities, detail: "Supply must be an exact positive integer and all prohibited authorities must be absent." },
@@ -210,12 +212,13 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
 }
 
 export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
-  manifestVersion: "1.3.0",
+  manifestVersion: "1.4.0",
   environment: "mainnet",
   launchClass: "production",
   lifecycle: "draft",
   metadata: {
-    schemaVersion: "1.3.0",
+    schemaVersion: "1.4.0",
+    launcher: "Hooded",
     projectId: "hooded-genesis",
     chain: "robinhood",
     name: "HOODED",
@@ -226,7 +229,7 @@ export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
     sourceCommit: "0000000",
     buildHash: "0".repeat(64),
     immutableCoreHash: "0".repeat(64),
-    factoryVersion: "1.3.0",
+    factoryVersion: "1.4.0",
     license: "AGPL-3.0-or-later",
     canonicalLaunchUrl: "https://hooded.world/launch/hooded-genesis",
     authorities: { futureMint: false, freeze: false, blacklist: false, mutableTax: false, arbitraryUpgrade: false },

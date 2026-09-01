@@ -7,15 +7,40 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ProRataFairLaunch} from "./ProRataFairLaunch.sol";
 
+struct CanonicalPoolDescriptor {
+    address token;
+    address quoteToken;
+    bytes32 venueId;
+    bytes32 poolId;
+    uint24 fee;
+    int24 tickSpacing;
+    address hook;
+    uint256 positionId;
+    address positionLock;
+}
+
+struct AdapterSecurityConfiguration {
+    address callbackAuthority;
+    bool enforcesInitialPrice;
+    bool rejectsExistingPoolPriceMismatch;
+}
+
 interface IRobinhoodLiquidityAdapter {
     function mintPermanentPosition(address token, address wrappedNative, uint256 tokenAmount, address positionRecipient)
         external
         payable
-        returns (uint256 positionId);
+        returns (CanonicalPoolDescriptor memory descriptor);
+
+    function securityConfiguration() external view returns (AdapterSecurityConfiguration memory configuration);
 }
 
 interface IBurnableLiquidityToken is IERC20 {
     function burn(uint256 amount) external;
+}
+
+interface IPermanentPositionReadback {
+    function locked() external view returns (bool);
+    function positionId() external view returns (uint256);
 }
 
 /// @notice Converts the manifest-bound quote share into a price-matched, permanently locked LP position.
@@ -25,6 +50,7 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
 
     ProRataFairLaunch public sale;
     address public immutable binder;
+    bytes32 public immutable manifestHash;
     IERC20 public immutable token;
     address public immutable wrappedNative;
     IRobinhoodLiquidityAdapter public immutable adapter;
@@ -38,11 +64,26 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
     bool public finalized;
     bool public retired;
     uint256 public positionId;
+    CanonicalPoolDescriptor public canonicalPool;
 
     event LiquidityFinalized(uint256 indexed positionId, uint256 tokenAmount, uint256 nativeAmount);
+    event CanonicalPoolActivated(
+        bytes32 indexed manifestHash,
+        address indexed token,
+        address indexed quoteToken,
+        bytes32 venueId,
+        bytes32 poolId,
+        uint24 fee,
+        int24 tickSpacing,
+        address hook,
+        uint256 positionId,
+        address positionLock
+    );
     event FailedLiquidityAllocationBurned(uint256 tokenAmount);
+    event UnfinalizedLiquidityRetired(uint256 tokenAmount, uint256 redirectedQuote);
 
     constructor(
+        bytes32 manifestHash_,
         address token_,
         address wrappedNative_,
         bytes32 wrappedNativeCodeHash_,
@@ -55,8 +96,9 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
         address positionLock_
     ) {
         require(
-            token_ != address(0) && wrappedNative_ != address(0) && adapter_ != address(0) && poolManager_ != address(0)
-                && positionManager_ != address(0) && positionLock_ != address(0),
+            manifestHash_ != bytes32(0) && token_ != address(0) && wrappedNative_ != address(0)
+                && adapter_ != address(0) && poolManager_ != address(0) && positionManager_ != address(0)
+                && positionLock_ != address(0),
             "zero address"
         );
         require(
@@ -66,6 +108,7 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
             "code hash mismatch"
         );
         binder = msg.sender;
+        manifestHash = manifestHash_;
         token = IERC20(token_);
         wrappedNative = wrappedNative_;
         wrappedNativeCodeHash = wrappedNativeCodeHash_;
@@ -94,20 +137,17 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
         require(address(sale) != address(0) && msg.sender == address(sale), "only sale");
     }
 
-    function harvest() public returns (uint256 withdrawn) {
-        require(address(sale) != address(0), "sale unbound");
-        withdrawn = sale.withdrawQuote();
-    }
-
     function finalize() external nonReentrant returns (uint256 mintedPositionId) {
         require(!finalized && !retired, "closed");
         require(block.timestamp > sale.endsAt(), "sale open");
         require(!sale.isRefunding() && sale.totalContributed() >= sale.minimumRaise(), "sale failed");
         require(sale.totalSettledContribution() == sale.totalContributed(), "unsettled contributions");
         finalized = true;
-        if (sale.claimableQuote(address(this)) > 0) harvest();
-        uint256 nativeAmount = address(this).balance;
+        uint256 nativeAmount = sale.claimableQuote(address(this));
         require(nativeAmount > 0, "no liquidity quote");
+        uint256 balanceBefore = address(this).balance;
+        uint256 withdrawn = sale.withdrawQuote();
+        require(withdrawn == nativeAmount && address(this).balance == balanceBefore + nativeAmount, "quote mismatch");
         uint256 tokenAmount = Math.mulDiv(nativeAmount, 1 ether, sale.pricePerToken());
         require(tokenAmount > 0 && tokenAmount <= token.balanceOf(address(this)), "liquidity allocation");
         require(
@@ -115,33 +155,63 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
                 && poolManager.codehash == poolManagerCodeHash && positionManager.codehash == positionManagerCodeHash,
             "code hash changed"
         );
+        AdapterSecurityConfiguration memory security = adapter.securityConfiguration();
+        require(security.callbackAuthority == poolManager, "invalid callback authority");
+        require(security.enforcesInitialPrice && security.rejectsExistingPoolPriceMismatch, "price protection disabled");
         token.forceApprove(address(adapter), tokenAmount);
-        mintedPositionId = adapter.mintPermanentPosition{value: nativeAmount}(
+        CanonicalPoolDescriptor memory descriptor = adapter.mintPermanentPosition{value: nativeAmount}(
             address(token), wrappedNative, tokenAmount, positionLock
         );
         token.forceApprove(address(adapter), 0);
-        positionId = mintedPositionId;
+        _validateDescriptor(descriptor);
+        canonicalPool = descriptor;
+        mintedPositionId = descriptor.positionId;
+        positionId = descriptor.positionId;
         uint256 unused = token.balanceOf(address(this));
         if (unused > 0) {
             _burnAndVerify(unused);
         }
         emit LiquidityFinalized(mintedPositionId, tokenAmount, nativeAmount);
+        emit CanonicalPoolActivated(
+            manifestHash,
+            descriptor.token,
+            descriptor.quoteToken,
+            descriptor.venueId,
+            descriptor.poolId,
+            descriptor.fee,
+            descriptor.tickSpacing,
+            descriptor.hook,
+            descriptor.positionId,
+            descriptor.positionLock
+        );
     }
 
     function retireFailedLaunch() external nonReentrant {
         require(!finalized && !retired, "closed");
         require(block.timestamp > sale.endsAt(), "sale open");
-        require(sale.isRefunding() || sale.totalContributed() < sale.minimumRaise(), "sale succeeded");
+        bool terminal = block.timestamp > sale.claimDeadline();
+        require(terminal || sale.isRefunding() || sale.totalContributed() < sale.minimumRaise(), "sale succeeded");
         require(sale.totalSettledContribution() == sale.totalContributed(), "unsettled contributions");
         retired = true;
+        uint256 redirectedQuote = terminal ? sale.redirectExpiredLiquidityQuoteToProceeds() : 0;
         uint256 balance = token.balanceOf(address(this));
         _burnAndVerify(balance);
-        emit FailedLiquidityAllocationBurned(balance);
+        if (terminal) emit UnfinalizedLiquidityRetired(balance, redirectedQuote);
+        else emit FailedLiquidityAllocationBurned(balance);
     }
 
     function _burnAndVerify(uint256 amount) private {
         uint256 supplyBefore = token.totalSupply();
         IBurnableLiquidityToken(address(token)).burn(amount);
         require(token.totalSupply() == supplyBefore - amount, "burn ineffective");
+    }
+
+    function _validateDescriptor(CanonicalPoolDescriptor memory descriptor) private view {
+        require(descriptor.token == address(token) && descriptor.quoteToken == wrappedNative, "pool asset mismatch");
+        require(descriptor.venueId != bytes32(0) && descriptor.poolId != bytes32(0), "missing pool identity");
+        require(descriptor.fee > 0 && descriptor.tickSpacing > 0, "invalid pool parameters");
+        require(descriptor.positionId > 0 && descriptor.positionLock == positionLock, "position mismatch");
+        IPermanentPositionReadback lock = IPermanentPositionReadback(positionLock);
+        require(lock.locked() && lock.positionId() == descriptor.positionId, "position not locked");
     }
 }

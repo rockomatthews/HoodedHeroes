@@ -6,7 +6,7 @@ This runbook is intentionally noncustodial. Repository scripts calculate bytecod
 
 1. Confirm the founder recipient and three 2-of-3 Safe signers out of band.
 2. Deploy/configure the Safe and seven-day DAO timelock; publish owners, threshold, modules, and delay.
-3. Freeze the v1.3 manifest, media hashes, Git commit, compiler settings, factory-created community vesting configuration, reward vault, eligibility signer, and legal/risk disclosures.
+3. Freeze the v1.4 manifest, media hashes, Git commit, compiler settings, factory-created community vesting configuration, reward vault, eligibility signer, and legal/risk disclosures.
 4. Generate the 3,000-Hero collection with `node scripts/generate-hero-collection.mjs`. Replace image-CID placeholders only after the image directory is pinned; recalculate the collection root after the final metadata directory is pinned.
 5. Record the final Hero metadata root and base URI. Do not deploy a mutable placeholder collection.
 
@@ -32,6 +32,8 @@ node scripts/robinhood-uniswap-readback.mjs
 
 The factory plan must report chain ID 4663, matching approval signer, reviewed bytecode hashes, sufficient deployer ETH, and `broadcasts: false`. The Uniswap readback must match the pinned WETH, PoolManager, and PositionManager addresses and reviewed runtime hashes in `docs/robinhood-uniswap-readback.md`. Regenerate both immediately before signing because the predicted address depends on the deployer nonce and protocol bytecode may change.
 
+The stable registry tests must prove both directions: the exact token address resolves at `/api/v1/launches/4663/{tokenAddress}`, and every address emitted by `/api/v1/token-lists/4663` resolves back to the same manifest, factory, pool ID, lock, and transactions. Invalid/non-Robinhood addresses must return 404; incomplete launches must remain `tradable: false` and absent from the token list.
+
 Record every static-analysis finding and review disposition in `docs/security-static-analysis.md`. A locally missing scanner is a failed release gate, not a silent pass.
 
 ## Gate 2 — HLAB1
@@ -49,7 +51,7 @@ Repeat HLAB1 evidence, then activate the thirty-minute owner-only sale with a fo
 
 ## Gate 4 — production factory and HOODED creation
 
-1. The original auditor retests the v1.3 follow-up remediation, then two independent reviewers approve the final source and bytecode including the Uniswap v4 adapter.
+1. Preserve the original auditor's v1.3 remediation evidence, obtain review of the v1.4 contract/interface changes, then have two independent reviewers approve the final source and bytecode including the Uniswap v4 adapter.
 2. Deploy and verify the approval registry/Safe, reward vault, production factory, liquidity adapter, and position manager integration. The factory creates and funds the community vesting vault as part of launch creation.
 3. Configure only verified addresses and runtime hashes in `.env`/Vercel environment variables.
 4. Change `ENABLE_PRODUCTION_LAUNCH_PREPARE` only after the infrastructure readback passes.
@@ -64,8 +66,16 @@ Repeat HLAB1 evidence, then activate the thirty-minute owner-only sale with a fo
 2. Eligibility permits may authorize contributions; claims and refunds never require permits.
 3. After close, permissionlessly settle every indexed contributor.
 4. Below 0.25 ETH: enter refunds and do not call the launch successful.
-5. At or above 0.25 ETH: burn unsold sale supply, harvest the 37.5% liquidity quote, mint a price-matched position to the ownerless receiver, burn unused liquidity tokens, and verify the NFT owner/code hashes.
+5. At or above 0.25 ETH: burn unsold sale supply, use only the coordinator's accounted sale-ledger quote, mint a price-matched position to the ownerless receiver, burn unused liquidity tokens, and verify the NFT owner/code hashes. Forced native balance must remain excluded from sizing.
 6. Enable the 25,000-HOODED preview gate only after verified token and sale addresses are configured and live readback succeeds.
+
+Finalize before `claimDeadline`. Once that deadline passes, any caller may terminally retire an unfinalized coordinator: the liquidity allocation burns and its accrued quote moves within the sale pull-payment ledger to the immutable DAO proceeds recipient. This is an irreversible failure escape hatch, not an alternate launch path.
+
+Eligibility permits begin at nonce 1. Signing a lower or newer permit does not revoke an older unused permit unless the signer first raises the contributor's on-chain floor with `invalidateEligibilityNonces`; use short deadlines and confirm the floor transaction before distributing a correction.
+
+Before public eligibility, obtain attributable confirmation from both Mancer and LI.FI for Robinhood Chain ID 4663 and the exact v4 venue configuration (PoolManager, PositionManager, fee, tick spacing, hook, wrapped native, and pool ID). Generic Uniswap or EVM support is insufficient. LI.FI testing must include destination-gas estimation/delivery and a fail-closed no-destination-gas case. Keep both registry readiness values `unverified` until those confirmations and bidirectional address tests are recorded.
+
+The independent adapter audit, callback-caller rejection tests, existing-pool price-mismatch tests, Permit2 allowance cleanup, mainnet-fork canary, runtime-code-hash readback, decoded unsigned simulation, and explicit finalization approval remain mandatory. Provider confirmation does not replace any adapter gate.
 
 ## Gate 6 — Genesis Heroes
 

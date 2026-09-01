@@ -109,7 +109,7 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
   await expect(page.getByRole("dialog", { name: "Code Bazaar panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Code Bazaar" })).toBeVisible();
   await expect(page.getByText("FOUNDRY-01 // FIRST SOCIETY PROJECT")).toBeVisible();
-  await expect(page.getByText("v1.3.0-retest-remediation")).toBeVisible();
+  await expect(page.getByText("v1.4.0-canonical-pool-remediation")).toBeVisible();
   await page.getByRole("button", { name: "Hero Reward Rounds" }).click();
   await expect(page.getByText("packages/contracts/src/HeroRoundRewardVault.sol", { exact: true })).toBeVisible();
   await expect(page.getByText("○ REQUIRED // O(1) round funding")).toBeVisible();
@@ -135,10 +135,10 @@ test("Launch Bay leads with HOODED genesis and keeps incomplete evidence blocked
   }
   await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("HOODED");
   await expect(page.getByText("HOODED GENESIS", { exact: true })).toBeVisible();
-  await expect(page.getByText("11/14")).toBeVisible();
+  await expect(page.getByText("12/15")).toBeVisible();
   await expect(page.getByRole("button", { name: "3 GATES BLOCKED" })).toBeDisabled();
   await page.getByRole("textbox", { name: "Bound owner wallet" }).fill("0x1111111111111111111111111111111111111111");
-  await expect(page.getByText("12/14")).toBeVisible();
+  await expect(page.getByText("13/15")).toBeVisible();
   await expect(page.getByRole("button", { name: "BASE" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "SOLANA" })).toBeDisabled();
   await expect(page.getByRole("textbox", { name: "Quote asset" })).toHaveValue("ETH");

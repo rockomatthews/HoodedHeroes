@@ -291,6 +291,40 @@ contract ProRataFairLaunchTest {
         assert(sale.claimableQuote(REWARDS) == 0.375 ether);
     }
 
+    function testExpiredLiquidityQuoteRedirectIsScopedAndConservesLiability() public {
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("expired-liquidity"));
+        ProRataFairLaunch.Config memory config = _config(address(token), 100 ether, 100 ether, 100 ether, 0);
+        config.liquidityRecipient = LIQUIDITY;
+        config.liquidityShareBps = 3_750;
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        token.transfer(address(sale), 1_000 ether);
+        sale.activate();
+        vm.deal(ALICE, 100 ether);
+        vm.warp(100);
+        vm.prank(ALICE);
+        sale.contribute{value: 100 ether}(address(0));
+        vm.warp(201);
+        sale.settleFor(ALICE);
+
+        vm.expectRevert(bytes("claims active"));
+        vm.prank(LIQUIDITY);
+        sale.redirectExpiredLiquidityQuoteToProceeds();
+        vm.warp(401);
+        vm.expectRevert(bytes("not liquidity recipient"));
+        vm.prank(ALICE);
+        sale.redirectExpiredLiquidityQuoteToProceeds();
+
+        uint256 liabilityBefore = sale.quoteLiability();
+        uint256 proceedsBefore = sale.claimableQuote(PROCEEDS);
+        vm.prank(LIQUIDITY);
+        uint256 redirected = sale.redirectExpiredLiquidityQuoteToProceeds();
+        assert(redirected == 37.5 ether);
+        assert(sale.claimableQuote(LIQUIDITY) == 0);
+        assert(sale.claimableQuote(PROCEEDS) == proceedsBefore + redirected);
+        assert(sale.quoteLiability() == liabilityBefore);
+    }
+
     function testUnsoldSupplyCanBePermanentlyBurned() public {
         FixedSupplyLaunchToken token =
             new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("burn-unsold"));

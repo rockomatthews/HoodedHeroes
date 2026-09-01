@@ -18,7 +18,7 @@ export const LAUNCH_BAY_PROJECT = {
   slug: "launch-bay",
   name: "Launch Bay",
   codename: "FOUNDRY-01",
-  version: "1.3.0-retest-remediation",
+  version: "1.4.0-canonical-pool-remediation",
   license: "AGPL-3.0-or-later",
   repository: "GitHub App protected repository",
   branchPolicy: "pull-request-only",
@@ -26,7 +26,7 @@ export const LAUNCH_BAY_PROJECT = {
   releaseGate: "No transaction is broadcast automatically. Mainnet creation requires local and fork tests, simulation, independent review, and the configured owner's explicit wallet signature.",
   workstreams: [
     { id: "launcher-core", label: "Launcher Core", path: "packages/contracts/src", stage: "hardening", checks: ["Foundry fuzz", "supply invariants", "refund invariants", "permanent liquidity receiver"] },
-    { id: "manifest-studio", label: "Manifest Studio", path: "packages/shared/src/launch-manifest.ts", stage: "implemented", checks: ["14 policy gates", "golden vectors", "metadata formats"] },
+    { id: "manifest-studio", label: "Manifest Studio", path: "packages/shared/src/launch-manifest.ts", stage: "implemented", checks: ["15 policy gates", "golden vectors", "metadata formats"] },
     { id: "hero-genesis", label: "HOODED Genesis", path: "packages/contracts/src/HoodedGenesis.sol", stage: "hardening", checks: ["3,000 exact cap", "founder IDs 1-10", "Hero purchase integration"] },
     { id: "hero-rounds", label: "Hero Reward Rounds", path: "packages/contracts/src/HeroRoundRewardVault.sol", stage: "hardening", checks: ["O(1) round funding", "manifest-bound fee harvest", "native fee wrapping", "carry conservation"] },
     { id: "solana-adapter", label: "Solana Adapter", path: "programs/launch-bay", stage: "planned", checks: ["program-test", "authority revocation", "Raydium migration"] },

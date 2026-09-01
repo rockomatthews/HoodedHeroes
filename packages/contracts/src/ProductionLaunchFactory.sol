@@ -15,7 +15,7 @@ import {TokenVestingVault} from "./TokenVestingVault.sol";
 contract ProductionLaunchFactory is EIP712 {
     using SafeERC20 for FixedSupplyLaunchToken;
 
-    string public constant TEMPLATE_VERSION = "1.3.0";
+    string public constant TEMPLATE_VERSION = "1.4.0";
     uint64 public constant MIN_COMMUNITY_VESTING_DURATION = 730 days;
     uint256 public constant MIN_VESTED_SUPPLY_BPS = 500;
     uint256 public constant MAX_VESTED_SUPPLY_BPS = 1_000;
@@ -130,6 +130,7 @@ contract ProductionLaunchFactory is EIP712 {
         require(saleConfig.liquidityShareBps > 0, "zero liquidity share");
         require(vestedAllocations.length > 0, "missing vested allocation");
         require(saleConfig.pricePerToken > 0, "zero price");
+        require(saleConfig.endsAt > block.timestamp, "sale window in the past");
         uint256 maximumLiquidityQuote = Math.mulDiv(saleConfig.maximumRaise, saleConfig.liquidityShareBps, BPS);
         uint256 requiredLiquidityTokens = Math.mulDiv(maximumLiquidityQuote, 1 ether, saleConfig.pricePerToken);
         require(liquidityConfig.tokenAllocation >= requiredLiquidityTokens, "liquidity allocation too small");
@@ -212,6 +213,7 @@ contract ProductionLaunchFactory is EIP712 {
         coordinator = new RobinhoodLiquidityCoordinator{
             salt: keccak256(abi.encode(manifestHash, "LIQUIDITY_COORDINATOR"))
         }(
+            manifestHash,
             token,
             config.wrappedNative,
             config.wrappedNativeCodeHash,

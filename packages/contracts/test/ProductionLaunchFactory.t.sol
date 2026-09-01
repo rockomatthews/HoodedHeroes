@@ -5,7 +5,12 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ProductionLaunchFactory} from "../src/ProductionLaunchFactory.sol";
 import {ProRataFairLaunch} from "../src/ProRataFairLaunch.sol";
-import {RobinhoodLiquidityCoordinator, IRobinhoodLiquidityAdapter} from "../src/RobinhoodLiquidityCoordinator.sol";
+import {
+    RobinhoodLiquidityCoordinator,
+    IRobinhoodLiquidityAdapter,
+    CanonicalPoolDescriptor,
+    AdapterSecurityConfiguration
+} from "../src/RobinhoodLiquidityCoordinator.sol";
 import {PermanentPositionReceiver} from "../src/PermanentPositionReceiver.sol";
 import {FixedSupplyLaunchToken} from "../src/FixedSupplyLaunchToken.sol";
 import {TokenVestingVault} from "../src/TokenVestingVault.sol";
@@ -36,13 +41,30 @@ contract MockRobinhoodAdapter is IRobinhoodLiquidityAdapter {
         manager = MockPositionManager(manager_);
     }
 
-    function mintPermanentPosition(address token, address, uint256 tokenAmount, address recipient)
+    function mintPermanentPosition(address token, address wrappedNative, uint256 tokenAmount, address recipient)
         external
         payable
-        returns (uint256 positionId)
+        returns (CanonicalPoolDescriptor memory descriptor)
     {
         require(IERC20(token).transferFrom(msg.sender, address(this), tokenAmount), "token transfer");
-        positionId = manager.mint(recipient);
+        uint256 positionId = manager.mint(recipient);
+        descriptor = CanonicalPoolDescriptor({
+            token: token,
+            quoteToken: wrappedNative,
+            venueId: keccak256("uniswap-v4"),
+            poolId: keccak256(abi.encode(token, wrappedNative, uint24(3_000), int24(60), address(0))),
+            fee: 3_000,
+            tickSpacing: 60,
+            hook: address(0),
+            positionId: positionId,
+            positionLock: recipient
+        });
+    }
+
+    function securityConfiguration() external view returns (AdapterSecurityConfiguration memory configuration) {
+        configuration = AdapterSecurityConfiguration({
+            callbackAuthority: address(manager), enforcesInitialPrice: true, rejectsExistingPoolPriceMismatch: true
+        });
     }
 }
 
@@ -121,6 +143,22 @@ contract ProductionLaunchFactoryTest {
         uint256 positionId = coordinator.finalize();
         PermanentPositionReceiver lock = PermanentPositionReceiver(coordinator.positionLock());
         assert(positionId == 1 && lock.locked() && lock.positionId() == 1);
+        (
+            address poolToken,
+            address poolQuote,
+            bytes32 venueId,
+            bytes32 poolId,
+            uint24 fee,
+            int24 tickSpacing,
+            address hook,
+            uint256 storedPositionId,
+            address storedPositionLock
+        ) = coordinator.canonicalPool();
+        assert(poolToken == tokenAddress && poolQuote == address(manager));
+        assert(venueId == keccak256("uniswap-v4") && poolId != bytes32(0));
+        assert(fee == 3_000 && tickSpacing == 60 && hook == address(0));
+        assert(storedPositionId == positionId && storedPositionLock == address(lock));
+        assert(coordinator.manifestHash() == manifestHash);
         assert(manager.ownerOf(1) == address(lock));
         assert(FixedSupplyLaunchToken(tokenAddress).balanceOf(address(adapter)) == 150 ether);
         TokenVestingVault vesting = TokenVestingVault(factory.vestingVaultFor(manifestHash, 0));
@@ -232,6 +270,27 @@ contract ProductionLaunchFactoryTest {
         vm.expectRevert(bytes("vested allocation too large"));
         vm.prank(CREATOR);
         factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 13, 1_000, signature);
+    }
+
+    function testFactoryRejectsPastSaleEndBeforeDeployingVesting() public {
+        vm.warp(1_000);
+        ProductionLaunchFactory factory = new ProductionLaunchFactory(vm.addr(APPROVER_KEY));
+        MockPositionManager manager = new MockPositionManager();
+        MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
+        ProductionLaunchFactory.TokenConfig memory tokenConfig =
+            ProductionLaunchFactory.TokenConfig("Launch", "LCH", 1_000 ether, keccak256("past-sale-window"));
+        ProRataFairLaunch.Config memory saleConfig = _saleConfig();
+        ProductionLaunchFactory.LiquidityConfig memory liquidity = _liquidity(manager, adapter);
+        ProductionLaunchFactory.Allocation[] memory direct = new ProductionLaunchFactory.Allocation[](1);
+        direct[0] = ProductionLaunchFactory.Allocation(address(0xD1), 400 ether);
+        ProductionLaunchFactory.VestedAllocation[] memory vested = new ProductionLaunchFactory.VestedAllocation[](1);
+        vested[0] = ProductionLaunchFactory.VestedAllocation(address(0xD2), 50 ether, 730 days);
+        bytes32 configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        bytes memory signature = _approval(factory, tokenConfig.manifestHash, configHash, 14, 2_000);
+
+        vm.expectRevert(bytes("sale window in the past"));
+        vm.prank(CREATOR);
+        factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 14, 2_000, signature);
     }
 
     function _saleConfig() private pure returns (ProRataFairLaunch.Config memory) {

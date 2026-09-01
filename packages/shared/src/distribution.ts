@@ -31,8 +31,20 @@ export function buildUniswapTokenList(metadata: LaunchMetadataV1, chainId: numbe
       symbol: metadata.symbol,
       decimals: metadata.decimals,
       logoURI: metadata.publication.image,
-      extensions: { launchPage: metadata.canonicalLaunchUrl, buildHash: metadata.buildHash, immutableCoreHash: metadata.immutableCoreHash, factoryVersion: metadata.factoryVersion },
+      extensions: { launcher: metadata.launcher, launcherUrl: "https://hooded.world", launchPage: metadata.canonicalLaunchUrl, buildHash: metadata.buildHash, immutableCoreHash: metadata.immutableCoreHash, factoryVersion: metadata.factoryVersion },
     }],
+  };
+}
+
+export function buildRobinhoodTokenList(metadata: LaunchMetadataV1[], timestamp: string) {
+  const tokens = metadata.map((entry) => buildUniswapTokenList(entry, 4663).tokens[0]);
+  const patch = metadata.reduce((highest, entry) => Math.max(highest, entry.revision.version), 0);
+  return {
+    name: "Hooded Verified Robinhood Chain Launches",
+    timestamp,
+    version: { major: 1, minor: 0, patch },
+    keywords: ["hooded", "robinhood-chain", "verified", "fair-launch"],
+    tokens,
   };
 }
 
