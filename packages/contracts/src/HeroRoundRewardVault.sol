@@ -10,6 +10,17 @@ interface ISequentialGenesisHeroes {
     function ownerOf(uint256 tokenId) external view returns (address);
 }
 
+interface ILaunchRewardSource {
+    function quoteToken() external view returns (address);
+    function rewardsRecipient() external view returns (address);
+    function claimableQuote(address recipient) external view returns (uint256);
+    function withdrawQuote() external returns (uint256 amount);
+}
+
+interface IWrappedNative is IERC20 {
+    function deposit() external payable;
+}
+
 /// @notice Equal-share universal rewards whose unclaimed balance follows each Genesis Hero NFT.
 /// @dev One global counter makes funding O(1); the first claim derives a token's entry counter from monotonic mint supply.
 contract HeroRoundRewardVault is ReentrancyGuard {
@@ -22,6 +33,7 @@ contract HeroRoundRewardVault is ReentrancyGuard {
 
     IERC20 public immutable rewardToken;
     ISequentialGenesisHeroes public immutable genesisHeroes;
+    address public immutable wrappedNative;
     uint256 public cumulativeRewardPerHero;
     uint256 public carry;
     uint256 public claimLiability;
@@ -30,17 +42,25 @@ contract HeroRoundRewardVault is ReentrancyGuard {
     mapping(uint256 => uint256) public heroStamp;
     mapping(uint256 => bool) public initialized;
     Checkpoint[] private checkpoints;
+    address private nativeFeeSource;
 
     event RoundFunded(
         uint256 indexed round, uint256 received, uint16 eligibleHeroes, uint256 rewardPerHero, uint256 carry
     );
     event HeroInitialized(uint256 indexed tokenId, uint256 entryIndex);
     event RewardDelivered(uint256 indexed tokenId, address indexed owner, uint256 amount);
+    event LaunchFeesHarvested(address indexed launch, address indexed quoteToken, uint256 received);
 
-    constructor(address rewardToken_, address genesisHeroes_) {
+    constructor(address rewardToken_, address genesisHeroes_, address wrappedNative_) {
         require(rewardToken_ != address(0) && genesisHeroes_ != address(0), "zero address");
+        require(wrappedNative_ == address(0) || wrappedNative_ == rewardToken_, "wrapper mismatch");
         rewardToken = IERC20(rewardToken_);
         genesisHeroes = ISequentialGenesisHeroes(genesisHeroes_);
+        wrappedNative = wrappedNative_;
+    }
+
+    receive() external payable {
+        require(nativeFeeSource != address(0) && msg.sender == nativeFeeSource, "native rejected");
     }
 
     function fundRound(uint256 amount) external nonReentrant returns (uint256 rewardPerHero) {
@@ -52,6 +72,49 @@ contract HeroRoundRewardVault is ReentrancyGuard {
         rewardToken.safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = rewardToken.balanceOf(address(this)) - beforeBalance;
         require(received > 0, "nothing received");
+
+        rewardPerHero = _recordRound(received);
+    }
+
+    /// @notice Pulls this vault's accrued Launch Bay fee share and opens a reward round.
+    /// @dev Native quote fees are atomically wrapped so Hero claims always transfer ERC-20 assets.
+    function harvestLaunchFees(address launch) external nonReentrant returns (uint256 rewardPerHero) {
+        require(launch.code.length > 0, "invalid launch");
+        ILaunchRewardSource source = ILaunchRewardSource(launch);
+        require(source.rewardsRecipient() == address(this), "wrong recipient");
+        address quote = source.quoteToken();
+        require(quote == address(rewardToken) || (quote == address(0) && wrappedNative != address(0)), "asset mismatch");
+        uint256 accrued = source.claimableQuote(address(this));
+        require(accrued > 0, "nothing accrued");
+
+        uint256 withdrawn;
+        if (quote == address(0)) {
+            nativeFeeSource = launch;
+            withdrawn = source.withdrawQuote();
+            nativeFeeSource = address(0);
+            require(withdrawn == accrued, "withdraw mismatch");
+            IWrappedNative(wrappedNative).deposit{value: withdrawn}();
+        } else {
+            withdrawn = source.withdrawQuote();
+            require(withdrawn == accrued, "withdraw mismatch");
+            require(rewardToken.balanceOf(address(this)) >= claimLiability + carry + withdrawn, "fees not received");
+        }
+
+        rewardPerHero = _recordRound(withdrawn);
+        emit LaunchFeesHarvested(launch, quote, withdrawn);
+    }
+
+    function accountedBalance() external view returns (uint256) {
+        return claimLiability + carry;
+    }
+
+    function isReconciled() external view returns (bool) {
+        return rewardToken.balanceOf(address(this)) >= claimLiability + carry;
+    }
+
+    function _recordRound(uint256 received) private returns (uint256 rewardPerHero) {
+        uint16 eligible = genesisHeroes.totalMinted();
+        require(eligible > 0, "no heroes");
 
         uint256 pool = received + carry;
         rewardPerHero = pool / eligible;

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import commandCenterArt from "../../../../art/concepts/02-secret-command-center.png";
 import { CodeBazaarWorkbench } from "./code-bazaar-workbench";
 import { CommunitySignal } from "./community-signal";
+import { HeroRewardLedger } from "./hero-reward-ledger";
 import { LaunchBayWorkbench } from "./launch-bay-workbench";
 
 type RoomId =
@@ -101,9 +102,9 @@ const ROOMS: Record<RoomId, Room> = {
     actions: ["Resume Power Grid", "Score receipts", "Mission archive"],
   },
   vault: {
-    id: "vault", label: "My Vault", eyebrow: "ASSETS // RECEIPTS", accent: "purple",
-    summary: "Inspect your HOODED balance, earned credits, equipment, claim receipts, and season rewards in one place.",
-    stats: [["$HOODED", "125,000"], ["Credits", "3,450"], ["Items", "07"]],
+    id: "vault", label: "My Vault", eyebrow: "PUBLIC REWARD ACCOUNTING // NO PLACEHOLDERS", accent: "purple",
+    summary: "Reconcile every Launch Bay fee round against the reward vault balance, outstanding Hero claims, delivered value, and carry.",
+    stats: [["Ledger", "PUBLIC"], ["Claims", "NFT-BOUND"], ["Weight", "1 / HERO"]],
     actions: ["Balances", "Equipment", "Reward receipts"],
   },
   profile: {
@@ -225,6 +226,8 @@ function RoomPanel({ room, onClose }: { room: Room; onClose: () => void }) {
         <CommunitySignal />
       ) : room.id === "launch-bay" ? (
         <LaunchBayWorkbench />
+      ) : room.id === "vault" ? (
+        <HeroRewardLedger />
       ) : (
         <div className="room-actions">{room.actions.map((action) => <button className={selectedAction === action ? "is-active" : ""} key={action} onClick={() => setSelectedAction(action)}><span>ACCESS</span>{action}<small>{selectedAction === action ? "SELECTED // PREVIEW READY" : "OPEN MODULE"}</small></button>)}</div>
       )}

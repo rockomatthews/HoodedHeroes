@@ -12,6 +12,7 @@ describe("LaunchManifestV1", () => {
     manifest.metadata.creatorWallet = "0x1111111111111111111111111111111111111111";
     manifest.metadata.sourceCommit = "a".repeat(40);
     manifest.metadata.buildHash = "b".repeat(64);
+    manifest.fees.rewardsRecipient = "0x2222222222222222222222222222222222222222";
     manifest.metadata.publication.image = "ipfs://bafybeigenuinehoodedicon";
     sealMetadata(manifest);
     const result = validateLaunchManifest(manifest);
@@ -24,7 +25,7 @@ describe("LaunchManifestV1", () => {
     manifest.metadata.creatorWallet = "0x1111111111111111111111111111111111111111";
     const result = validateLaunchManifest(manifest);
     expect(result.ready).toBe(false);
-    expect(result.checks.filter((check) => !check.passed).map((check) => check.id)).toEqual(expect.arrayContaining(["metadata", "build"]));
+    expect(result.checks.filter((check) => !check.passed).map((check) => check.id)).toEqual(expect.arrayContaining(["metadata", "build", "fees"]));
   });
 
   it("canonicalizes metadata revisions independent of object insertion order", () => {

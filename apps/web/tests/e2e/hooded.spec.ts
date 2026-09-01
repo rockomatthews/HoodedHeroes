@@ -96,14 +96,24 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
     await page.getByRole("button", { name: new RegExp(`Close ${dialog.replace(" panel", "")}`, "i") }).click();
   }
 
+  await page.getByRole("button", { name: "Open My Vault" }).click();
+  const vaultPanel = page.getByRole("dialog", { name: "My Vault panel" });
+  await expect(page.getByRole("region", { name: "Hero reward ledger" })).toBeVisible();
+  const vaultDimensions = await vaultPanel.evaluate((element) => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight }));
+  expect(vaultDimensions.scrollHeight).toBeLessThanOrEqual(vaultDimensions.clientHeight + 1);
+  await expect(page.getByText("UNIVERSAL HERO REWARDS // PUBLIC LEDGER")).toBeVisible();
+  await expect(page.getByText("CANARY NOT CONFIGURED")).toBeVisible();
+  await page.getByRole("button", { name: "Close My Vault" }).click();
+
   await page.getByRole("button", { name: "Open Code Bazaar" }).click();
   await expect(page.getByRole("dialog", { name: "Code Bazaar panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Code Bazaar" })).toBeVisible();
   await expect(page.getByText("FOUNDRY-01 // FIRST SOCIETY PROJECT")).toBeVisible();
-  await expect(page.getByText("v0.2.0-mainnet-canary")).toBeVisible();
+  await expect(page.getByText("v0.3.0-reward-ledger")).toBeVisible();
   await page.getByRole("button", { name: "Hero Reward Rounds" }).click();
   await expect(page.getByText("packages/contracts/src/HeroRoundRewardVault.sol / proposal.ts")).toBeVisible();
   await expect(page.getByText("○ REQUIRED // O(1) round funding")).toBeVisible();
+  await expect(page.getByText("○ REQUIRED // manifest-bound fee harvest")).toBeVisible();
   await expect(page.getByText("○ REQUIRED // carry conservation")).toBeVisible();
   await page.getByRole("button", { name: "Run policy suite" }).click();
   await expect(page.getByText("5/5 CHECKS PASSED")).toBeVisible();
@@ -124,10 +134,10 @@ test("Launch Bay leads with HOODED genesis and keeps incomplete evidence blocked
   }
   await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("HOODED");
   await expect(page.getByText("HOODED GENESIS", { exact: true })).toBeVisible();
-  await expect(page.getByText("10/13")).toBeVisible();
-  await expect(page.getByRole("button", { name: "3 GATES BLOCKED" })).toBeDisabled();
+  await expect(page.getByText("9/13")).toBeVisible();
+  await expect(page.getByRole("button", { name: "4 GATES BLOCKED" })).toBeDisabled();
   await page.getByRole("textbox", { name: "Bound owner wallet" }).fill("0x1111111111111111111111111111111111111111");
-  await expect(page.getByText("11/13")).toBeVisible();
+  await expect(page.getByText("10/13")).toBeVisible();
   await page.getByRole("button", { name: "SOLANA" }).click();
   await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Community Launch");
   await expect(page.getByRole("textbox", { name: "Quote asset" })).toHaveValue("SOL");

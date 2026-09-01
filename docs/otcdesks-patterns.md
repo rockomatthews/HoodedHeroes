@@ -35,6 +35,10 @@ Research snapshot: 2026-08-31. Sources reviewed: the live [OTCDesks product](htt
 - equal per-Hero accounting with late-mint exclusion;
 - token-ID-bound stamps so accrued value follows ownership;
 - rounding carry, funded/delivered/liability counters, and public checkpoints;
+- permissionless Launch Bay fee harvesting with exact reward-recipient and quote-asset checks;
+- atomic native-fee wrapping so claims remain ERC-20 transfers;
 - no owner, withdrawal, rescue, fee change, participant-weight change, or arbitrary-call path.
+
+The public `GET /api/rewards/hero-rounds` endpoint reads the vault, Genesis collection, and reward token at one Robinhood Chain block. The My Vault room renders those verified totals and fails closed with no simulated balances when the deployment address is absent or unavailable.
 
 The contract is unaudited and not authorized for deployment. It requires invariant testing, independent review, UI disclosure, and an approved funding manifest before mainnet consideration.

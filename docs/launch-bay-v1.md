@@ -4,7 +4,7 @@ Launch Bay v1 is a fixed-price, timed, pro-rata fair-launch mainnet-canary candi
 
 ## Implemented foundations
 
-- Thirteen deterministic manifest gates, including a bound canary creator, fixed supply, exact allocation conservation, approved chain quote assets, 1% fee cap, immutable authority flags, permanent liquidity, metadata completeness, reproducible source hashes, and sealed owner-only execution.
+- Thirteen deterministic manifest gates, including a bound canary creator, fixed supply, exact allocation conservation, approved chain quote assets, 1% fee cap, a published nonzero Hero reward-vault recipient, immutable authority flags, permanent liquidity, metadata completeness, reproducible source hashes, and sealed owner-only execution.
 - Shared pro-rata allocation simulator with integer rounding equivalent to the EVM contract.
 - Metaplex, Uniswap Token List, and DEX Screener payload generation from one versioned metadata record.
 - Public launch list/detail/validation/simulation endpoints.
@@ -12,10 +12,12 @@ Launch Bay v1 is a fixed-price, timed, pro-rata fair-launch mainnet-canary candi
 - `FixedSupplyLaunchToken`, `LaunchFactory`, `ProRataFairLaunch`, and `ImmutableReferralRegistry` contracts.
 - Permissionless failed-launch refunds, oversubscription refunds, incident-pause-to-refund behavior, settlement on behalf of inactive contributors, immutable recipients, and no owner withdrawal. Quote proceeds, fees, and refunds use recipient-owned pull balances, so a recipient that rejects ETH cannot block anyone else's settlement. Unsold tokens cannot move until every contribution has settled.
 - Owner-only unsigned creation and activation preparation routes with exact factory/sale bytecode checks, immutable-owner readback, manifest-hash checks, gas estimation, and required mainnet `eth_call` simulation.
+- Launch preparation requires the manifest reward recipient, submitted execution recipient, and server-configured chain reward vault to match exactly. The reward vault can permissionlessly pull its accrued sale-fee balance into a new equal-per-Hero round; native fees are wrapped before accounting.
+- Public `GET /api/rewards/hero-rounds` analytics read all totals at one block and expose funded value, outstanding liability, delivered value, carry, vault balance, per-Hero index, round count, eligible supply, and reconciliation status without exposing the RPC endpoint.
 
 ## Deliberately disabled
 
-No deployment address is bundled. The prepare endpoint refuses to create an unsigned transaction until the configured mainnet factory bytecode, immutable canary owner, manifest lifecycle, and full call simulation all match. It never broadcasts. Solana activation, Stock Token pairs, public sale activation, listing submissions, and paid promotion remain closed approval gates.
+No deployment address is bundled. The prepare endpoint refuses to create an unsigned transaction until the configured mainnet factory bytecode, immutable canary owner, chain-specific Hero reward-vault address and runtime bytecode hash, manifest lifecycle, and full call simulation all match. It never broadcasts. The public reward ledger displays `CANARY NOT CONFIGURED` rather than placeholder balances until a reviewed vault address and code hash exist. Solana activation, Stock Token pairs, public sale activation, listing submissions, and paid promotion remain closed approval gates.
 
 ## HOODED genesis preset
 
@@ -35,7 +37,7 @@ After setting `LAUNCH_CANARY_OWNER_ADDRESS`, run `pnpm canary:factory-plan:rh` t
 
 Run `pnpm canary:evidence` to rebuild the Solidity suite and print a reproducible evidence record containing the source commit, compiler settings, ABI hashes, bytecode hashes, and byte sizes. Use `node scripts/canary-build-evidence.mjs --require-clean` for release evidence.
 
-The current Slither review leaves explicit findings for intentional timestamp windows, the caller-only native-asset withdrawal, exact fixed-supply allocation conservation, low-level referral-registry detection, and OpenZeppelin pragma variation. The pull-payment design has a hostile-recipient regression test, and state is cleared before withdrawal. These findings require independent auditor review before a mainnet signature; static analysis is not an audit.
+The current Slither review leaves explicit findings for intentional timestamp windows, the caller-only native-asset withdrawal, exact fixed-supply allocation conservation, low-level referral-registry detection, OpenZeppelin pragma variation, the constructor-bound wrapped-native deposit, and conservative reentrancy heuristics around guarded fee harvesting. The pull-payment design has a hostile-recipient regression test; the harvester requires the immutable recipient, matching quote asset, exact accrued/withdrawn amount, post-transfer balance reconciliation, and a reentrancy guard. These findings require independent auditor review before a mainnet signature; static analysis is not an audit.
 
 ## Metadata cost discipline
 

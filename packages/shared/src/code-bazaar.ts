@@ -18,7 +18,7 @@ export const LAUNCH_BAY_PROJECT = {
   slug: "launch-bay",
   name: "Launch Bay",
   codename: "FOUNDRY-01",
-  version: "0.2.0-mainnet-canary",
+  version: "0.3.0-reward-ledger",
   license: "AGPL-3.0-or-later",
   repository: "rockomatthews/HOODED",
   branchPolicy: "pull-request-only",
@@ -28,7 +28,7 @@ export const LAUNCH_BAY_PROJECT = {
     { id: "launcher-core", label: "Launcher Core", path: "packages/contracts/src", stage: "hardening", checks: ["Foundry fuzz", "supply invariants", "refund invariants"] },
     { id: "manifest-studio", label: "Manifest Studio", path: "packages/shared/src/launch-manifest.ts", stage: "implemented", checks: ["13 policy gates", "golden vectors", "metadata formats"] },
     { id: "hero-genesis", label: "HOODED Genesis", path: "packages/contracts/src/HoodedToken.sol", stage: "hardening", checks: ["1B fixed supply", "no mint authority", "Hero purchase integration"] },
-    { id: "hero-rounds", label: "Hero Reward Rounds", path: "packages/contracts/src/HeroRoundRewardVault.sol", stage: "hardening", checks: ["O(1) round funding", "late-mint exclusion", "transfer-bound accrual", "carry conservation"] },
+    { id: "hero-rounds", label: "Hero Reward Rounds", path: "packages/contracts/src/HeroRoundRewardVault.sol", stage: "hardening", checks: ["O(1) round funding", "manifest-bound fee harvest", "native fee wrapping", "carry conservation"] },
     { id: "solana-adapter", label: "Solana Adapter", path: "programs/launch-bay", stage: "planned", checks: ["program-test", "authority revocation", "Raydium migration"] },
   ] satisfies readonly BazaarWorkstream[],
   bounties: [

@@ -93,6 +93,7 @@ export type LaunchManifestV1 = {
     operationsShareBps: 5_000;
     rewardsShareBps: 3_000;
     referralShareBps: 2_000;
+    rewardsRecipient: string;
   };
   liquidity: {
     venue: "uniswap-v4" | "raydium-cpmm";
@@ -167,7 +168,7 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
     { id: "window", label: "Timed fair launch", passed: Number.isFinite(startsAt) && Number.isFinite(endsAt) && endsAt > startsAt, detail: "The contribution window must have valid increasing timestamps." },
     { id: "raise", label: "Fixed price and wallet limits", passed: monetaryValues.every(isIntegerString) && BigInt(sale.minimumRaise) > 0n && BigInt(sale.maximumRaise) >= BigInt(sale.minimumRaise) && BigInt(sale.maximumContributionPerWallet) > 0n && fixedPriceMatches, detail: "All monetary values use integer base units; EVM price × sale allocation must exactly equal the maximum raise." },
     { id: "quote", label: "Approved quote asset", passed: CHAIN_QUOTES[metadata.chain].includes(sale.quoteAsset), detail: "Quote asset must be approved for the selected chain." },
-    { id: "fees", label: "Transparent capped fee", passed: fees.saleFeeBps >= 0 && fees.saleFeeBps <= 100 && fees.operationsShareBps + fees.rewardsShareBps + fees.referralShareBps === 10_000, detail: "Sale fee cannot exceed 1% and recipient shares must equal 100%." },
+    { id: "fees", label: "Transparent capped fee", passed: fees.saleFeeBps >= 0 && fees.saleFeeBps <= 100 && fees.operationsShareBps + fees.rewardsShareBps + fees.referralShareBps === 10_000 && /^0x[a-fA-F0-9]{40}$/.test(fees.rewardsRecipient) && !/^0x0{40}$/i.test(fees.rewardsRecipient), detail: "Sale fee cannot exceed 1%, recipient shares must equal 100%, and the immutable Hero reward vault must be published." },
     { id: "liquidity", label: "Permanent liquidity", passed: manifest.liquidity.permanentlyLocked && (metadata.chain === "solana" ? manifest.liquidity.venue === "raydium-cpmm" : manifest.liquidity.venue === "uniswap-v4"), detail: "Liquidity must be permanently locked at the approved chain venue." },
     { id: "metadata", label: "Distribution metadata", passed: metadata.publication.summary.trim().length >= 20 && metadata.publication.description.trim().length >= 50 && metadata.publication.riskDisclosure.trim().length >= 20 && publicationUrls.every(isHttpUrl) && !hasPlaceholderMetadata, detail: "Complete descriptive, risk, and valid non-placeholder distribution URLs are required." },
     { id: "build", label: "Reproducible source", passed: hasReproducibleBuild, detail: "Non-placeholder source commit, build hash, and metadata content hash must be published." },
@@ -224,7 +225,7 @@ export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
     quoteAsset: "ETH",
   },
   vesting: { creatorMonths: 24, contributorMonths: 24 },
-  fees: { saleFeeBps: 75, operationsShareBps: 5_000, rewardsShareBps: 3_000, referralShareBps: 2_000 },
+  fees: { saleFeeBps: 75, operationsShareBps: 5_000, rewardsShareBps: 3_000, referralShareBps: 2_000, rewardsRecipient: "0x0000000000000000000000000000000000000000" },
   liquidity: { venue: "uniswap-v4", permanentlyLocked: true },
   canary: { creatorAccess: "single-wallet", sealedAtCreation: true, separatePublicActivation: true, mainnetForkRequired: true, transactionSimulationRequired: true },
 };

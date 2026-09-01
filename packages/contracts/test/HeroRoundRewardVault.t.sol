@@ -3,9 +3,13 @@ pragma solidity 0.8.27;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {FixedSupplyLaunchToken} from "../src/FixedSupplyLaunchToken.sol";
 import {HeroRoundRewardVault} from "../src/HeroRoundRewardVault.sol";
+import {ProRataFairLaunch} from "../src/ProRataFairLaunch.sol";
 
 interface RoundVm {
+    function deal(address who, uint256 newBalance) external;
+    function warp(uint256 newTimestamp) external;
     function prank(address sender) external;
     function expectRevert(bytes calldata reason) external;
 }
@@ -15,6 +19,14 @@ contract MockRoundToken is ERC20 {
 
     function mint(address recipient, uint256 amount) external {
         _mint(recipient, amount);
+    }
+}
+
+contract MockWrappedNative is ERC20 {
+    constructor() ERC20("Wrapped Native", "WNATIVE") {}
+
+    function deposit() external payable {
+        _mint(msg.sender, msg.value);
     }
 }
 
@@ -43,7 +55,7 @@ contract HeroRoundRewardVaultTest {
     function setUp() public {
         token = new MockRoundToken();
         heroes = new MockSequentialHeroes();
-        vault = new HeroRoundRewardVault(address(token), address(heroes));
+        vault = new HeroRoundRewardVault(address(token), address(heroes), address(0));
         token.mint(address(this), 1_000 ether);
         token.approve(address(vault), type(uint256).max);
     }
@@ -113,6 +125,54 @@ contract HeroRoundRewardVaultTest {
         assert(vault.totalFunded() == amount);
         assert(vault.claimLiability() + vault.carry() == amount);
         assert(vault.cumulativeRewardPerHero() * heroCount + vault.carry() == amount);
+        assert(vault.accountedBalance() == amount);
+        assert(vault.isReconciled());
+    }
+
+    function testNativeLaunchFeesBecomeWrappedHeroRound() public {
+        heroes.mint(ALICE);
+        heroes.mint(BOB);
+        MockWrappedNative wrapped = new MockWrappedNative();
+        HeroRoundRewardVault nativeVault = new HeroRoundRewardVault(address(wrapped), address(heroes), address(wrapped));
+        FixedSupplyLaunchToken saleToken =
+            new FixedSupplyLaunchToken("Launch", "LCH", 1_000 ether, address(this), keccak256("reward-round"));
+        ProRataFairLaunch.Config memory config = ProRataFairLaunch.Config({
+            saleToken: address(saleToken),
+            quoteToken: address(0),
+            saleAllocation: 1_000 ether,
+            pricePerToken: 0.1 ether,
+            minimumRaise: 100 ether,
+            maximumRaise: 100 ether,
+            walletCap: 100 ether,
+            startsAt: 100,
+            endsAt: 200,
+            claimDeadline: 400,
+            saleFeeBps: 100,
+            creator: address(this),
+            securityCouncil: address(0xC0),
+            proceedsRecipient: address(0xD1),
+            operationsRecipient: address(0xD2),
+            rewardsRecipient: address(nativeVault),
+            referralRegistry: address(0),
+            unsoldRecipient: address(0xD4)
+        });
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        saleToken.transfer(address(sale), 1_000 ether);
+        sale.activate();
+        vm.deal(ALICE, 100 ether);
+        vm.warp(100);
+        vm.prank(ALICE);
+        sale.contribute{value: 100 ether}(address(0));
+        vm.warp(201);
+        sale.settleFor(ALICE);
+
+        assert(sale.claimableQuote(address(nativeVault)) == 0.5 ether);
+        vm.prank(CAROL);
+        nativeVault.harvestLaunchFees(address(sale));
+        assert(wrapped.balanceOf(address(nativeVault)) == 0.5 ether);
+        assert(nativeVault.preview(1) == 0.25 ether);
+        assert(nativeVault.preview(2) == 0.25 ether);
+        assert(nativeVault.isReconciled());
     }
 
     function testCannotFundBeforeAnyHeroExists() public {

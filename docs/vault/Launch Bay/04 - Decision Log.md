@@ -15,3 +15,7 @@ Reason: consistent economics do not justify pretending different execution model
 Accepted: Markdown knowledge graph under `docs/vault`.  
 Reason: decisions, threats, tests, and release evidence should evolve through the same pull-request controls as code. Personal Obsidian state remains untracked.
 
+## LB-ADR-004 — Manifest-bound Hero reward routing
+
+Accepted: every EVM launch commits one chain-specific Hero reward vault as its immutable fee recipient. The manifest, unsigned execution input, and server configuration must agree exactly. Native quote fees are wrapped before entering equal-per-Hero accounting.
+Reason: a visible percentage is meaningless if the recipient can change at signing time; one reconciled vault creates a public, auditable community-fee ledger.
