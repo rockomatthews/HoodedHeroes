@@ -28,6 +28,7 @@ export const LAUNCH_BAY_PROJECT = {
     { id: "launcher-core", label: "Launcher Core", path: "packages/contracts/src", stage: "hardening", checks: ["Foundry fuzz", "supply invariants", "refund invariants"] },
     { id: "manifest-studio", label: "Manifest Studio", path: "packages/shared/src/launch-manifest.ts", stage: "implemented", checks: ["13 policy gates", "golden vectors", "metadata formats"] },
     { id: "hero-genesis", label: "HOODED Genesis", path: "packages/contracts/src/HoodedToken.sol", stage: "hardening", checks: ["1B fixed supply", "no mint authority", "Hero purchase integration"] },
+    { id: "hero-rounds", label: "Hero Reward Rounds", path: "packages/contracts/src/HeroRoundRewardVault.sol", stage: "hardening", checks: ["O(1) round funding", "late-mint exclusion", "transfer-bound accrual", "carry conservation"] },
     { id: "solana-adapter", label: "Solana Adapter", path: "programs/launch-bay", stage: "planned", checks: ["program-test", "authority revocation", "Raydium migration"] },
   ] satisfies readonly BazaarWorkstream[],
   bounties: [

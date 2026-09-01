@@ -25,7 +25,7 @@ if (build.status !== 0) {
   process.exit(build.status ?? 1);
 }
 
-const names = ["LaunchFactory", "FixedSupplyLaunchToken", "ProRataFairLaunch", "TokenVestingVault", "PermanentPositionLock"];
+const names = ["LaunchFactory", "FixedSupplyLaunchToken", "ProRataFairLaunch", "TokenVestingVault", "PermanentPositionLock", "HeroRoundRewardVault"];
 const components = Object.fromEntries(names.map((name) => {
   const abi = run("forge", ["inspect", name, "abi", "--json"]);
   const bytecode = run("forge", ["inspect", name, "bytecode"]);

@@ -101,6 +101,10 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
   await expect(page.getByRole("heading", { name: "Code Bazaar" })).toBeVisible();
   await expect(page.getByText("FOUNDRY-01 // FIRST SOCIETY PROJECT")).toBeVisible();
   await expect(page.getByText("v0.2.0-mainnet-canary")).toBeVisible();
+  await page.getByRole("button", { name: "Hero Reward Rounds" }).click();
+  await expect(page.getByText("packages/contracts/src/HeroRoundRewardVault.sol / proposal.ts")).toBeVisible();
+  await expect(page.getByText("○ REQUIRED // O(1) round funding")).toBeVisible();
+  await expect(page.getByText("○ REQUIRED // carry conservation")).toBeVisible();
   await page.getByRole("button", { name: "Run policy suite" }).click();
   await expect(page.getByText("5/5 CHECKS PASSED")).toBeVisible();
   await page.getByRole("button", { name: "OPEN BOUNTIES" }).click();

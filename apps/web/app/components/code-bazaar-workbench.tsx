@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { LAUNCH_BAY_PROJECT } from "@hooded/shared";
 
-const MODULES = LAUNCH_BAY_PROJECT.workstreams.slice(0, 3);
+const MODULES = LAUNCH_BAY_PROJECT.workstreams.filter((item) => item.stage !== "planned");
 const DEFAULT_CODE = `// HOODED Community Proposal
 export const launchTemplate = {
   fixedSupply: true,

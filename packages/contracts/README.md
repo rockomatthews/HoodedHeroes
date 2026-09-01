@@ -10,4 +10,6 @@ Unaudited implementation foundations:
 
 The canary factory binds creation to one immutable wallet, commits the manifest hash in each token, uses deterministic CREATE2 addresses, prevents manifest replay, and creates every sale sealed. Activation is a separate creator transaction. `PermanentPositionLock` can irreversibly receive exactly one predetermined LP-position NFT from one predetermined position manager; it has no owner, transfer, rescue, or arbitrary-call path.
 
+`HeroRoundRewardVault` is an independent cumulative-index reward primitive inspired by public reward-accounting patterns. It funds equal universal ERC-20 rounds across the sequential Genesis Hero supply without looping over holders; late-minted Heroes do not receive prior rounds, unclaimed value follows the NFT, anyone can trigger delivery to the current owner, and rounding carry is preserved. It must not be used for eligibility-restricted Stock Tokens.
+
 Before any deployment: complete role analysis, invariant coverage, mainnet-fork testing, independent audit, Safe/timelock wiring, bytecode verification, and a full unsigned simulation rehearsal. Stock Token claim contracts are intentionally not included in this unaudited vertical slice.
