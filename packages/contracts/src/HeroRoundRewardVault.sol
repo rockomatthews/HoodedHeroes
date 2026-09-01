@@ -5,9 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-interface ISequentialGenesisHeroes {
+interface IGenesisHeroes {
     function totalMinted() external view returns (uint16);
     function ownerOf(uint256 tokenId) external view returns (address);
+    function mintSequence(uint256 tokenId) external view returns (uint16);
 }
 
 interface ILaunchRewardSource {
@@ -22,7 +23,7 @@ interface IWrappedNative is IERC20 {
 }
 
 /// @notice Equal-share universal rewards whose unclaimed balance follows each Genesis Hero NFT.
-/// @dev One global counter makes funding O(1); the first claim derives a token's entry counter from monotonic mint supply.
+/// @dev One global counter makes funding O(1); entitlement uses the NFT's monotonic mint sequence, never its tier-based ID.
 contract HeroRoundRewardVault is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -32,7 +33,7 @@ contract HeroRoundRewardVault is ReentrancyGuard {
     }
 
     IERC20 public immutable rewardToken;
-    ISequentialGenesisHeroes public immutable genesisHeroes;
+    IGenesisHeroes public immutable genesisHeroes;
     address public immutable wrappedNative;
     uint256 public cumulativeRewardPerHero;
     uint256 public carry;
@@ -55,7 +56,7 @@ contract HeroRoundRewardVault is ReentrancyGuard {
         require(rewardToken_ != address(0) && genesisHeroes_ != address(0), "zero address");
         require(wrappedNative_ == address(0) || wrappedNative_ == rewardToken_, "wrapper mismatch");
         rewardToken = IERC20(rewardToken_);
-        genesisHeroes = ISequentialGenesisHeroes(genesisHeroes_);
+        genesisHeroes = IGenesisHeroes(genesisHeroes_);
         wrappedNative = wrappedNative_;
     }
 
@@ -65,9 +66,6 @@ contract HeroRoundRewardVault is ReentrancyGuard {
 
     function fundRound(uint256 amount) external nonReentrant returns (uint256 rewardPerHero) {
         require(amount > 0, "zero funding");
-        uint16 eligible = genesisHeroes.totalMinted();
-        require(eligible > 0, "no heroes");
-
         uint256 beforeBalance = rewardToken.balanceOf(address(this));
         rewardToken.safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = rewardToken.balanceOf(address(this)) - beforeBalance;
@@ -165,11 +163,13 @@ contract HeroRoundRewardVault is ReentrancyGuard {
     }
 
     function _entryIndex(uint256 tokenId) private view returns (uint256) {
+        uint16 sequence = genesisHeroes.mintSequence(tokenId);
+        require(sequence > 0, "missing mint sequence");
         uint256 low = 0;
         uint256 high = checkpoints.length;
         while (low < high) {
             uint256 middle = (low + high) / 2;
-            if (checkpoints[middle].eligibleSupply >= tokenId) high = middle;
+            if (checkpoints[middle].eligibleSupply >= sequence) high = middle;
             else low = middle + 1;
         }
         return low < checkpoints.length ? checkpoints[low].indexBefore : cumulativeRewardPerHero;

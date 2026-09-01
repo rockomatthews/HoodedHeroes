@@ -1,6 +1,6 @@
 # HOODED contracts
 
-Original HOODED sources are licensed under AGPL-3.0-or-later. The package includes the Launch Bay v1.1 owner-only lab path and Safe-approved production path. These contracts remain unaudited and are not authorized for deployment.
+Original HOODED sources are licensed under AGPL-3.0-or-later. The package includes the Launch Bay v1.2 owner-only lab path and full-configuration-bound Safe-approved production path. The initial source audit found deployment blockers; this remediation requires auditor retesting and is not authorized for deployment.
 
 Unaudited implementation foundations:
 

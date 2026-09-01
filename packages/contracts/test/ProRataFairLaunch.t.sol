@@ -85,6 +85,32 @@ contract ProRataFairLaunchTest {
         assert(ALICE.balance == 10 ether);
     }
 
+    function testAnyoneCanSettleFailedSaleRefundThenBurnUnsold() public {
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("failed-burn"));
+        ProRataFairLaunch.Config memory config = _config(address(token), 50 ether, 100 ether, 50 ether, 0);
+        config.burnUnsold = true;
+        config.unsoldRecipient = address(0);
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        token.transfer(address(sale), 1_000 ether);
+        sale.activate();
+        vm.deal(ALICE, 20 ether);
+        vm.deal(BOB, 10 ether);
+        vm.warp(100);
+        vm.prank(ALICE);
+        sale.contribute{value: 20 ether}(address(0));
+        vm.prank(BOB);
+        sale.contribute{value: 10 ether}(address(0));
+        vm.warp(401);
+        sale.refundFor(ALICE);
+        sale.refundFor(BOB);
+        assert(sale.claimableQuote(ALICE) == 20 ether);
+        assert(sale.claimableQuote(BOB) == 10 ether);
+        sale.sweepUnsold();
+        assert(token.balanceOf(address(sale)) == 0);
+        assert(token.totalSupply() == 0);
+    }
+
     function testSuccessfulContributionCanBeSettledPermissionlessly() public {
         (FixedSupplyLaunchToken token, ProRataFairLaunch sale) = _nativeSale(20 ether, 100 ether, 100 ether, 0);
         vm.deal(ALICE, 20 ether);
@@ -240,6 +266,14 @@ contract ProRataFairLaunchTest {
         sale.activate();
         sale.activate();
         assert(sale.activated());
+    }
+
+    function testUnfundedSaleCannotActivate() public {
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("unfunded"));
+        ProRataFairLaunch sale = new ProRataFairLaunch(_config(address(token), 20 ether, 100 ether, 100 ether, 0));
+        vm.expectRevert(bytes("sale unfunded"));
+        sale.activate();
     }
 
     function testFuzzPreviewNeverAllocatesMoreThanSale(uint96 a, uint96 b) public {

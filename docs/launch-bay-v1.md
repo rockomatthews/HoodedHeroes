@@ -1,6 +1,6 @@
 # Launch Bay v1 implementation
 
-Launch Bay v1.1 is a fixed-price, timed, pro-rata fair-launch candidate for Robinhood Chain. `LaunchManifestV1.1` drives UI validation, simulation, metadata, APIs, and contract configuration. HOODED does not use public testnets: evidence comes from local tests, mainnet forks, unsigned simulations, two owner-only lab launches, and independent review.
+Launch Bay v1.2 is a fixed-price, timed, pro-rata fair-launch remediation candidate for Robinhood Chain. The versioned launch manifest drives UI validation, simulation, metadata, APIs, and contract configuration. HOODED does not use public testnets: evidence comes from local tests, mainnet forks, unsigned simulations, two owner-only lab launches, and independent review.
 
 ## Implemented foundations
 

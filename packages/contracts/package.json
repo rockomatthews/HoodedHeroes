@@ -3,5 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "scripts": { "test": "forge test", "build": "forge build" },
-  "dependencies": { "@openzeppelin/contracts": "5.4.0" }
+  "dependencies": { "@openzeppelin/contracts": "5.4.0" },
+  "devDependencies": { "forge-std": "github:foundry-rs/forge-std#v1.16.2" }
 }

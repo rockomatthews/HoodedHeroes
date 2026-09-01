@@ -5,6 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
+interface IBurnableSaleToken is IERC20 {
+    function burn(uint256 amount) external;
+}
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
@@ -162,6 +166,7 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
         require(msg.sender == creator, "not creator");
         require(!activated && !cancelled, "activation closed");
         require(block.timestamp < startsAt, "window started");
+        require(saleToken.balanceOf(address(this)) >= saleAllocation, "sale unfunded");
         activated = true;
         emit Activated(msg.sender);
     }
@@ -235,15 +240,24 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
     }
 
     function refund() external nonReentrant {
+        _refund(msg.sender);
+    }
+
+    /// @notice Anyone may settle a failed-sale refund into the contributor's pull balance.
+    function refundFor(address contributor) external nonReentrant {
+        _refund(contributor);
+    }
+
+    function _refund(address contributor) private {
         require(block.timestamp > endsAt, "sale open");
         require(isRefunding() || totalContributed < minimumRaise, "launch successful");
-        require(!settled[msg.sender], "already settled");
-        uint256 amount = contributed[msg.sender];
+        require(!settled[contributor], "already settled");
+        uint256 amount = contributed[contributor];
         require(amount > 0, "no contribution");
-        settled[msg.sender] = true;
+        settled[contributor] = true;
         totalSettledContribution += amount;
-        _accrueQuote(msg.sender, amount);
-        emit Refunded(msg.sender, amount);
+        _accrueQuote(contributor, amount);
+        emit Refunded(contributor, amount);
     }
 
     /// @notice Withdraws only the quote assets accrued to the caller.
@@ -276,8 +290,9 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
         uint256 balance = saleToken.balanceOf(address(this));
         require(balance > 0, "nothing to sweep");
         if (burnUnsold) {
-            (bool ok,) = address(saleToken).call(abi.encodeWithSignature("burn(uint256)", balance));
-            require(ok, "burn failed");
+            uint256 supplyBefore = saleToken.totalSupply();
+            IBurnableSaleToken(address(saleToken)).burn(balance);
+            require(saleToken.totalSupply() == supplyBefore - balance, "burn ineffective");
             emit UnsoldBurned(balance);
         } else {
             saleToken.safeTransfer(unsoldRecipient, balance);
@@ -331,7 +346,7 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
         address signer = ECDSA.recover(_hashTypedDataV4(structHash), signature);
         require(signer == eligibilitySigner, "invalid eligibility");
         usedEligibilityNonce[contributor][nonce] = true;
-        if (allowance > authorizedAllowance[contributor]) authorizedAllowance[contributor] = allowance;
+        authorizedAllowance[contributor] = allowance;
         emit EligibilityAuthorized(contributor, allowance, nonce);
     }
 

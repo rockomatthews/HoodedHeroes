@@ -8,6 +8,7 @@ import {ProRataFairLaunch} from "../src/ProRataFairLaunch.sol";
 import {RobinhoodLiquidityCoordinator, IRobinhoodLiquidityAdapter} from "../src/RobinhoodLiquidityCoordinator.sol";
 import {PermanentPositionReceiver} from "../src/PermanentPositionReceiver.sol";
 import {FixedSupplyLaunchToken} from "../src/FixedSupplyLaunchToken.sol";
+import {TokenVestingVault} from "../src/TokenVestingVault.sol";
 
 interface ProductionVm {
     function addr(uint256 privateKey) external returns (address);
@@ -15,6 +16,7 @@ interface ProductionVm {
     function prank(address sender) external;
     function deal(address who, uint256 newBalance) external;
     function warp(uint256 timestamp) external;
+    function expectRevert(bytes calldata reason) external;
 }
 
 contract MockPositionManager is ERC721 {
@@ -92,14 +94,19 @@ contract ProductionLaunchFactoryTest {
             positionManager: address(manager),
             positionManagerCodeHash: address(manager).codehash
         });
-        ProductionLaunchFactory.Allocation[] memory allocations = new ProductionLaunchFactory.Allocation[](1);
-        allocations[0] = ProductionLaunchFactory.Allocation(address(0xDA0), 450 ether);
+        ProductionLaunchFactory.Allocation[] memory allocations = new ProductionLaunchFactory.Allocation[](2);
+        allocations[0] = ProductionLaunchFactory.Allocation(address(0xD3), 300 ether);
+        allocations[1] = ProductionLaunchFactory.Allocation(address(0xDA0), 100 ether);
+        ProductionLaunchFactory.VestedAllocation[] memory vested = new ProductionLaunchFactory.VestedAllocation[](1);
+        vested[0] = ProductionLaunchFactory.VestedAllocation(address(0xDA0), 50 ether, 730 days);
         uint256 nonce = 1;
         uint256 deadline = 1_000;
-        bytes memory signature = _approval(factory, manifestHash, nonce, deadline);
+        bytes32 configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, allocations, vested);
+        bytes memory signature = _approval(factory, manifestHash, configHash, nonce, deadline);
         vm.prank(CREATOR);
-        (address tokenAddress, address saleAddress) =
-            factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, allocations, nonce, deadline, signature);
+        (address tokenAddress, address saleAddress) = factory.createApprovedLaunch(
+            tokenConfig, saleConfig, liquidity, allocations, vested, nonce, deadline, signature
+        );
         ProRataFairLaunch sale = ProRataFairLaunch(payable(saleAddress));
         RobinhoodLiquidityCoordinator coordinator = RobinhoodLiquidityCoordinator(payable(sale.liquidityRecipient()));
         assert(FixedSupplyLaunchToken(tokenAddress).balanceOf(address(coordinator)) == 150 ether);
@@ -116,12 +123,127 @@ contract ProductionLaunchFactoryTest {
         assert(positionId == 1 && lock.locked() && lock.positionId() == 1);
         assert(manager.ownerOf(1) == address(lock));
         assert(FixedSupplyLaunchToken(tokenAddress).balanceOf(address(adapter)) == 150 ether);
+        TokenVestingVault vesting = TokenVestingVault(factory.vestingVaultFor(manifestHash, 0));
+        assert(address(vesting.token()) == tokenAddress);
+        assert(vesting.beneficiary() == address(0xDA0));
+        assert(vesting.duration() == 730 days);
+        assert(FixedSupplyLaunchToken(tokenAddress).balanceOf(address(vesting)) == 50 ether);
     }
 
-    function _approval(ProductionLaunchFactory factory, bytes32 manifestHash, uint256 nonce, uint256 deadline)
+    function testApprovalBindsEveryConfigurationField() public {
+        address approver = vm.addr(APPROVER_KEY);
+        ProductionLaunchFactory factory = new ProductionLaunchFactory(approver);
+        MockPositionManager manager = new MockPositionManager();
+        MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
+        bytes32 manifestHash = keccak256("bound-manifest");
+        ProductionLaunchFactory.TokenConfig memory tokenConfig =
+            ProductionLaunchFactory.TokenConfig("Launch", "LCH", 1_000 ether, manifestHash);
+        ProRataFairLaunch.Config memory saleConfig = _saleConfig();
+        ProductionLaunchFactory.LiquidityConfig memory liquidity = _liquidity(manager, adapter);
+        ProductionLaunchFactory.Allocation[] memory direct = new ProductionLaunchFactory.Allocation[](1);
+        direct[0] = ProductionLaunchFactory.Allocation(address(0xD1), 400 ether);
+        ProductionLaunchFactory.VestedAllocation[] memory vested = new ProductionLaunchFactory.VestedAllocation[](1);
+        vested[0] = ProductionLaunchFactory.VestedAllocation(address(0xD2), 50 ether, 730 days);
+        bytes32 configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        bytes memory signature = _approval(factory, manifestHash, configHash, 7, 1_000);
+        saleConfig.saleFeeBps = 100;
+        vm.prank(CREATOR);
+        vm.expectRevert(bytes("invalid approval"));
+        factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 7, 1_000, signature);
+    }
+
+    function testFactoryRejectsNonNativeQuoteZeroLiquidityShareAndShortVesting() public {
+        address approver = vm.addr(APPROVER_KEY);
+        ProductionLaunchFactory factory = new ProductionLaunchFactory(approver);
+        MockPositionManager manager = new MockPositionManager();
+        MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
+        ProductionLaunchFactory.LiquidityConfig memory liquidity = _liquidity(manager, adapter);
+        ProductionLaunchFactory.Allocation[] memory direct = new ProductionLaunchFactory.Allocation[](1);
+        direct[0] = ProductionLaunchFactory.Allocation(address(0xD1), 400 ether);
+        ProductionLaunchFactory.VestedAllocation[] memory vested = new ProductionLaunchFactory.VestedAllocation[](1);
+        vested[0] = ProductionLaunchFactory.VestedAllocation(address(0xD2), 50 ether, 730 days);
+
+        ProductionLaunchFactory.TokenConfig memory tokenConfig =
+            ProductionLaunchFactory.TokenConfig("Launch", "LCH", 1_000 ether, keccak256("erc20-quote"));
+        ProRataFairLaunch.Config memory saleConfig = _saleConfig();
+        saleConfig.quoteToken = address(manager);
+        bytes32 configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        bytes memory signature = _approval(factory, tokenConfig.manifestHash, configHash, 8, 1_000);
+        vm.expectRevert(bytes("native quote only"));
+        vm.prank(CREATOR);
+        factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 8, 1_000, signature);
+
+        tokenConfig.manifestHash = keccak256("zero-share");
+        saleConfig = _saleConfig();
+        saleConfig.liquidityShareBps = 0;
+        configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        signature = _approval(factory, tokenConfig.manifestHash, configHash, 9, 1_000);
+        vm.expectRevert(bytes("zero liquidity share"));
+        vm.prank(CREATOR);
+        factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 9, 1_000, signature);
+
+        tokenConfig.manifestHash = keccak256("short-vesting");
+        saleConfig = _saleConfig();
+        vested[0].duration = 729 days;
+        configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        signature = _approval(factory, tokenConfig.manifestHash, configHash, 10, 1_000);
+        vm.expectRevert(bytes("vesting below minimum"));
+        vm.prank(CREATOR);
+        factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 10, 1_000, signature);
+    }
+
+    function _saleConfig() private pure returns (ProRataFairLaunch.Config memory) {
+        return ProRataFairLaunch.Config({
+            saleToken: address(0),
+            quoteToken: address(0),
+            saleAllocation: 400 ether,
+            pricePerToken: 0.25 ether,
+            minimumRaise: 1 ether,
+            maximumRaise: 100 ether,
+            walletCap: 100 ether,
+            startsAt: 100,
+            endsAt: 200,
+            claimDeadline: 400,
+            saleFeeBps: 0,
+            creator: address(0),
+            securityCouncil: address(0xC0),
+            proceedsRecipient: address(0xD1),
+            liquidityRecipient: address(0),
+            operationsRecipient: address(0xD2),
+            rewardsRecipient: address(0xD3),
+            referralRegistry: address(0),
+            unsoldRecipient: address(0),
+            eligibilitySigner: address(0),
+            liquidityShareBps: 3_750,
+            burnUnsold: true
+        });
+    }
+
+    function _liquidity(MockPositionManager manager, MockRobinhoodAdapter adapter)
         private
-        returns (bytes memory)
+        view
+        returns (ProductionLaunchFactory.LiquidityConfig memory)
     {
+        return ProductionLaunchFactory.LiquidityConfig({
+            tokenAllocation: 150 ether,
+            wrappedNative: address(manager),
+            wrappedNativeCodeHash: address(manager).codehash,
+            adapter: address(adapter),
+            adapterCodeHash: address(adapter).codehash,
+            poolManager: address(manager),
+            poolManagerCodeHash: address(manager).codehash,
+            positionManager: address(manager),
+            positionManagerCodeHash: address(manager).codehash
+        });
+    }
+
+    function _approval(
+        ProductionLaunchFactory factory,
+        bytes32 manifestHash,
+        bytes32 configHash,
+        uint256 nonce,
+        uint256 deadline
+    ) private returns (bytes memory) {
         bytes32 domain = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
@@ -131,7 +253,8 @@ contract ProductionLaunchFactoryTest {
                 address(factory)
             )
         );
-        bytes32 structHash = keccak256(abi.encode(factory.APPROVAL_TYPEHASH(), CREATOR, manifestHash, nonce, deadline));
+        bytes32 structHash =
+            keccak256(abi.encode(factory.APPROVAL_TYPEHASH(), CREATOR, manifestHash, configHash, nonce, deadline));
         (uint8 v, bytes32 r, bytes32 s) =
             vm.sign(APPROVER_KEY, keccak256(abi.encodePacked("\x19\x01", domain, structHash)));
         return abi.encodePacked(r, s, v);

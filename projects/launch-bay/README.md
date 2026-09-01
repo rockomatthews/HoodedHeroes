@@ -12,7 +12,7 @@ This folder is the project's contribution front door. Production code remains in
 
 ## Current milestone
 
-`v1.1.0-mainnet-candidate` is the Robinhood Chain implementation and evidence foundation. It uses local tests, Robinhood Chain mainnet forks, owner-only lab rehearsals, unsigned simulations, and independent review rather than public testnets. It is not an audited or deployed release. Base and Solana remain visible backlogs and must not be represented as production-ready.
+`v1.2.0-audit-remediation` fixes the Critical and four High findings reported against `e9d6466`, enforces 24-month vesting on-chain, and remains a Robinhood Chain implementation candidate. It is not approved or deployed: the auditor must retest the remediation commit, and the independently reviewed Uniswap v4 adapter remains a separate deployment gate. Base and Solana remain unavailable.
 
 The two rehearsal identities are permanently reserved as `HOODED LAB 01 / HLAB1` and `HOODED LAB 02 / HLAB2`. Both are experimental, have no promised value, and create no public liquidity pool.
 

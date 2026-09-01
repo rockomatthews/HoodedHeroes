@@ -4,11 +4,14 @@ pragma solidity 0.8.27;
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @notice Genesis membership contract. One primary mint per wallet; tier caps total exactly 3,000.
 /// @dev Metadata reveal and mint activation should sit behind a deployment timelock in production.
 contract HoodedGenesis is ERC721, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     uint16 public constant FOUNDER_GRANT = 10;
     enum Tier {
         Recruit,
@@ -27,6 +30,8 @@ contract HoodedGenesis is ERC721, ReentrancyGuard {
     address public immutable daoTimelock;
     mapping(address => bool) public usedPrimaryMint;
     mapping(uint256 => Tier) public originTier;
+    /// @notice Monotonic mint position, independent of tier-based token ID ranges.
+    mapping(uint256 => uint16) public mintSequence;
     address public immutable founder;
     uint64 public immutable publicMintStartsAt;
     bytes32 public immutable metadataRoot;
@@ -62,6 +67,7 @@ contract HoodedGenesis is ERC721, ReentrancyGuard {
         totalMinted = FOUNDER_GRANT;
         for (uint256 tokenId = 1; tokenId <= FOUNDER_GRANT; ++tokenId) {
             originTier[tokenId] = Tier.Recruit;
+            mintSequence[tokenId] = uint16(tokenId);
             _mint(founder_, tokenId);
         }
         emit FounderGrantMinted(founder_, 1, FOUNDER_GRANT);
@@ -79,13 +85,14 @@ contract HoodedGenesis is ERC721, ReentrancyGuard {
         totalMinted += 1;
         tokenId = uint256(tierOffsets[tierIndex]) + tierMinted[tierIndex];
         originTier[tokenId] = tier;
+        mintSequence[tokenId] = totalMinted;
 
-        require(hoodedToken.transferFrom(msg.sender, address(this), price), "payment failed");
+        hoodedToken.safeTransferFrom(msg.sender, address(this), price);
 
         uint256 burnAmount = price * 40 / 100;
         ERC20Burnable(address(hoodedToken)).burn(burnAmount);
-        require(hoodedToken.transfer(seasonalRewards, price * 40 / 100), "reward transfer failed");
-        require(hoodedToken.transfer(daoTimelock, price * 20 / 100), "treasury transfer failed");
+        hoodedToken.safeTransfer(seasonalRewards, price * 40 / 100);
+        hoodedToken.safeTransfer(daoTimelock, price * 20 / 100);
 
         _safeMint(msg.sender, tokenId);
         emit GenesisMinted(msg.sender, tokenId, tier, price);

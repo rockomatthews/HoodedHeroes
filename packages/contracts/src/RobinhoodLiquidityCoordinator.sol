@@ -14,6 +14,10 @@ interface IRobinhoodLiquidityAdapter {
         returns (uint256 positionId);
 }
 
+interface IBurnableLiquidityToken is IERC20 {
+    function burn(uint256 amount) external;
+}
+
 /// @notice Converts the manifest-bound quote share into a price-matched, permanently locked LP position.
 /// @dev The adapter and position manager are pinned by runtime bytecode hash. There is no rescue or owner path.
 contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
@@ -81,6 +85,8 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
             "invalid sale"
         );
         require(ProRataFairLaunch(payable(sale_)).liquidityRecipient() == address(this), "wrong recipient");
+        require(address(ProRataFairLaunch(payable(sale_)).quoteToken()) == address(0), "native quote only");
+        require(ProRataFairLaunch(payable(sale_)).liquidityShareBps() > 0, "zero liquidity share");
         sale = ProRataFairLaunch(payable(sale_));
     }
 
@@ -113,11 +119,11 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
         mintedPositionId = adapter.mintPermanentPosition{value: nativeAmount}(
             address(token), wrappedNative, tokenAmount, positionLock
         );
+        token.forceApprove(address(adapter), 0);
         positionId = mintedPositionId;
         uint256 unused = token.balanceOf(address(this));
         if (unused > 0) {
-            (bool ok,) = address(token).call(abi.encodeWithSignature("burn(uint256)", unused));
-            require(ok, "unused burn failed");
+            _burnAndVerify(unused);
         }
         emit LiquidityFinalized(mintedPositionId, tokenAmount, nativeAmount);
     }
@@ -129,8 +135,13 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
         require(sale.totalSettledContribution() == sale.totalContributed(), "unsettled contributions");
         retired = true;
         uint256 balance = token.balanceOf(address(this));
-        (bool ok,) = address(token).call(abi.encodeWithSignature("burn(uint256)", balance));
-        require(ok, "burn failed");
+        _burnAndVerify(balance);
         emit FailedLiquidityAllocationBurned(balance);
+    }
+
+    function _burnAndVerify(uint256 amount) private {
+        uint256 supplyBefore = token.totalSupply();
+        IBurnableLiquidityToken(address(token)).burn(amount);
+        require(token.totalSupply() == supplyBefore - amount, "burn ineffective");
     }
 }

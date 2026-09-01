@@ -23,7 +23,6 @@ const requestSchema = z.object({
     rewardsFeeRecipient: address,
     referralRegistry: address,
     eligibilitySigner: address,
-    grantsVestingRecipient: address,
     rewardsAllocationRecipient: address,
     treasuryRecipient: address,
     liquidityAdapter: address,
@@ -35,7 +34,7 @@ const requestSchema = z.object({
     positionManagerCodeHash: hex32,
     approvalNonce: z.string().regex(/^\d+$/),
     approvalDeadline: z.string().datetime(),
-    approvalSignature: signature,
+    approvalSignature: signature.optional(),
     claimDeadline: z.string().datetime(),
   }),
 });
@@ -63,18 +62,23 @@ const productionFactoryAbi = [{
     { name: "saleConfig", type: "tuple", components: saleComponents },
     { name: "liquidityConfig", type: "tuple", components: liquidityComponents },
     { name: "otherAllocations", type: "tuple[]", components: [{ name: "recipient", type: "address" }, { name: "amount", type: "uint256" }] },
+    { name: "vestedAllocations", type: "tuple[]", components: [{ name: "beneficiary", type: "address" }, { name: "amount", type: "uint256" }, { name: "duration", type: "uint64" }] },
     { name: "approvalNonce", type: "uint256" }, { name: "approvalDeadline", type: "uint256" }, { name: "approvalSignature", type: "bytes" },
   ],
   outputs: [{ name: "tokenAddress", type: "address" }, { name: "fairLaunchAddress", type: "address" }],
 }, {
   type: "function", name: "approvalSigner", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
+}, {
+  type: "function", name: "hashLaunchConfiguration", stateMutability: "pure",
+  inputs: [
+    { name: "tokenConfig", type: "tuple", components: tokenComponents },
+    { name: "saleConfig", type: "tuple", components: saleComponents },
+    { name: "liquidityConfig", type: "tuple", components: liquidityComponents },
+    { name: "otherAllocations", type: "tuple[]", components: [{ name: "recipient", type: "address" }, { name: "amount", type: "uint256" }] },
+    { name: "vestedAllocations", type: "tuple[]", components: [{ name: "beneficiary", type: "address" }, { name: "amount", type: "uint256" }, { name: "duration", type: "uint64" }] },
+  ],
+  outputs: [{ name: "", type: "bytes32" }],
 }] as const;
-const vestingVaultAbi = [
-  { type: "function", name: "token", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
-  { type: "function", name: "beneficiary", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
-  { type: "function", name: "duration", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint64" }] },
-  { type: "function", name: "totalAllocation", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
-] as const;
 
 function exactAllocation(supply: bigint, bps: number) {
   const numerator = supply * BigInt(bps);
@@ -104,15 +108,13 @@ export async function POST(request: Request) {
     const rewardVaultHash = process.env.RH_HERO_REWARD_VAULT_CODE_HASH?.toLowerCase() as Hex | undefined;
     const timelockRaw = process.env.RH_DAO_TIMELOCK_ADDRESS;
     const timelockHash = process.env.RH_DAO_TIMELOCK_CODE_HASH?.toLowerCase() as Hex | undefined;
-    const grantsVestingHash = process.env.RH_GRANTS_VESTING_CODE_HASH?.toLowerCase() as Hex | undefined;
     const approvalSignerRaw = process.env.RH_LAUNCH_APPROVAL_SIGNER;
-    if (!rpcUrl || !factoryRaw || !factoryHash || !rewardVaultRaw || !rewardVaultHash || !timelockRaw || !timelockHash || !grantsVestingHash || !approvalSignerRaw || !isAddress(factoryRaw) || !isAddress(rewardVaultRaw) || !isAddress(timelockRaw) || !isAddress(approvalSignerRaw)) {
+    if (!rpcUrl || !factoryRaw || !factoryHash || !rewardVaultRaw || !rewardVaultHash || !timelockRaw || !timelockHash || !approvalSignerRaw || !isAddress(factoryRaw) || !isAddress(rewardVaultRaw) || !isAddress(timelockRaw) || !isAddress(approvalSignerRaw)) {
       return Response.json({ error: "Verified Robinhood Chain production contracts are not configured" }, { status: 503 });
     }
     const factory = getAddress(factoryRaw);
     const rewardVault = getAddress(rewardVaultRaw);
     const timelock = getAddress(timelockRaw);
-    const grantsVesting = getAddress(execution.grantsVestingRecipient);
     if (getAddress(execution.rewardsFeeRecipient) !== rewardVault) return Response.json({ error: "Hero reward fee recipient mismatch" }, { status: 422 });
     if (getAddress(execution.rewardsAllocationRecipient) !== rewardVault) return Response.json({ error: "Hero reward allocation recipient mismatch" }, { status: 422 });
     if (getAddress(execution.proceedsRecipient) !== timelock || getAddress(execution.treasuryRecipient) !== timelock) {
@@ -123,9 +125,9 @@ export async function POST(request: Request) {
       return Response.json({ error: "Canonical Robinhood Chain Uniswap v4 manager mismatch" }, { status: 422 });
     }
     const client = createPublicClient({ transport: http(rpcUrl) });
-    const [factoryCode, rewardCode, timelockCode, grantsVestingCode, wethCode, adapterCode, poolManagerCode, managerCode, onchainApprovalSigner] = await Promise.all([
+    const [factoryCode, rewardCode, timelockCode, wethCode, adapterCode, poolManagerCode, managerCode, onchainApprovalSigner] = await Promise.all([
       client.getCode({ address: factory }), client.getCode({ address: rewardVault }),
-      client.getCode({ address: timelock }), client.getCode({ address: grantsVesting }),
+      client.getCode({ address: timelock }),
       client.getCode({ address: CANONICAL_RH_WETH }), client.getCode({ address: getAddress(execution.liquidityAdapter) }), client.getCode({ address: CANONICAL_RH_V4_POOL_MANAGER }),
       client.getCode({ address: CANONICAL_RH_V4_POSITION_MANAGER }),
       client.readContract({ address: factory, abi: productionFactoryAbi, functionName: "approvalSigner" }),
@@ -133,7 +135,6 @@ export async function POST(request: Request) {
     if (!factoryCode || keccak256(factoryCode).toLowerCase() !== factoryHash) return Response.json({ error: "Production factory bytecode mismatch" }, { status: 409 });
     if (!rewardCode || keccak256(rewardCode).toLowerCase() !== rewardVaultHash) return Response.json({ error: "Reward vault bytecode mismatch" }, { status: 409 });
     if (!timelockCode || keccak256(timelockCode).toLowerCase() !== timelockHash) return Response.json({ error: "DAO timelock bytecode mismatch" }, { status: 409 });
-    if (!grantsVestingCode || keccak256(grantsVestingCode).toLowerCase() !== grantsVestingHash) return Response.json({ error: "Community grants vesting vault bytecode mismatch" }, { status: 409 });
     if (!wethCode || keccak256(wethCode).toLowerCase() !== execution.wrappedNativeCodeHash.toLowerCase()) return Response.json({ error: "WETH bytecode mismatch" }, { status: 409 });
     if (!adapterCode || keccak256(adapterCode).toLowerCase() !== execution.liquidityAdapterCodeHash.toLowerCase()) return Response.json({ error: "Liquidity adapter bytecode mismatch" }, { status: 409 });
     if (!poolManagerCode || keccak256(poolManagerCode).toLowerCase() !== execution.poolManagerCodeHash.toLowerCase()) return Response.json({ error: "Pool manager bytecode mismatch" }, { status: 409 });
@@ -160,27 +161,46 @@ export async function POST(request: Request) {
       positionManager: CANONICAL_RH_V4_POSITION_MANAGER, positionManagerCodeHash: execution.positionManagerCodeHash as Hex,
     };
     const otherAllocations = [
-      { recipient: getAddress(execution.grantsVestingRecipient), amount: exactAllocation(supply, manifest.sale.creatorAllocationBps) },
       { recipient: getAddress(execution.rewardsAllocationRecipient), amount: exactAllocation(supply, manifest.sale.rewardsAllocationBps) },
       { recipient: getAddress(execution.treasuryRecipient), amount: exactAllocation(supply, manifest.sale.treasuryAllocationBps) },
     ];
-    const args = [tokenConfig, saleConfig, liquidityConfig, otherAllocations, BigInt(execution.approvalNonce), BigInt(Math.floor(Date.parse(execution.approvalDeadline) / 1_000)), execution.approvalSignature as Hex] as const;
+    const vestedAllocations = [
+      { beneficiary: timelock, amount: exactAllocation(supply, manifest.sale.creatorAllocationBps), duration: 730n * 24n * 60n * 60n },
+    ];
+    const configHash = await client.readContract({
+      address: factory, abi: productionFactoryAbi, functionName: "hashLaunchConfiguration",
+      args: [tokenConfig, saleConfig, liquidityConfig, otherAllocations, vestedAllocations],
+    });
+    const approvalDeadline = BigInt(Math.floor(Date.parse(execution.approvalDeadline) / 1_000));
+    if (!execution.approvalSignature) {
+      return Response.json({
+        prepared: false,
+        approvalRequired: true,
+        typedData: {
+          domain: { name: "HOODED Launch Approval", version: "1", chainId: 4663, verifyingContract: factory },
+          primaryType: "LaunchApproval",
+          types: {
+            LaunchApproval: [
+              { name: "creator", type: "address" }, { name: "manifestHash", type: "bytes32" },
+              { name: "configHash", type: "bytes32" }, { name: "nonce", type: "uint256" },
+              { name: "deadline", type: "uint256" },
+            ],
+          },
+          message: { creator: session.wallet, manifestHash, configHash, nonce: execution.approvalNonce, deadline: approvalDeadline.toString() },
+        },
+        idempotencyKey,
+        warning: "Have the configured review Safe sign this exact EIP-712 payload, then repeat the request with approvalSignature.",
+        validation,
+      });
+    }
+    const args = [tokenConfig, saleConfig, liquidityConfig, otherAllocations, vestedAllocations, BigInt(execution.approvalNonce), approvalDeadline, execution.approvalSignature as Hex] as const;
     const data = encodeFunctionData({ abi: productionFactoryAbi, functionName: "createApprovedLaunch", args });
     const simulation = await client.simulateContract({ account: session.wallet as Address, address: factory, abi: productionFactoryAbi, functionName: "createApprovedLaunch", args });
-    const [vestingToken, vestingBeneficiary, vestingDuration, vestingAllocation] = await Promise.all([
-      client.readContract({ address: grantsVesting, abi: vestingVaultAbi, functionName: "token" }),
-      client.readContract({ address: grantsVesting, abi: vestingVaultAbi, functionName: "beneficiary" }),
-      client.readContract({ address: grantsVesting, abi: vestingVaultAbi, functionName: "duration" }),
-      client.readContract({ address: grantsVesting, abi: vestingVaultAbi, functionName: "totalAllocation" }),
-    ]);
-    if (getAddress(vestingToken) !== getAddress(simulation.result[0]) || getAddress(vestingBeneficiary) !== timelock || vestingDuration < 730n * 24n * 60n * 60n || vestingAllocation !== exactAllocation(supply, manifest.sale.creatorAllocationBps)) {
-      return Response.json({ error: "Community grants vesting vault configuration mismatch" }, { status: 409 });
-    }
     const gas = await client.estimateGas({ account: session.wallet as Address, to: factory, data });
     return Response.json({
       prepared: true,
       unsigned: { chainId: 4663, from: session.wallet, to: factory, data, value: "0", gas: gas.toString() },
-      receipt: { manifestHash, predictedToken: simulation.result[0], predictedSale: simulation.result[1], factoryCodeHash: factoryHash },
+      receipt: { manifestHash, configHash, predictedToken: simulation.result[0], predictedSale: simulation.result[1], factoryCodeHash: factoryHash },
       idempotencyKey,
       warning: "Unsigned only. HOODED never broadcasts this transaction or stores a private key.",
       validation,

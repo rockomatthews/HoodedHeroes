@@ -6,12 +6,16 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {FixedSupplyLaunchToken} from "../src/FixedSupplyLaunchToken.sol";
 import {HeroRoundRewardVault} from "../src/HeroRoundRewardVault.sol";
 import {ProRataFairLaunch} from "../src/ProRataFairLaunch.sol";
+import {HoodedToken} from "../src/HoodedToken.sol";
+import {HoodedGenesis} from "../src/HoodedGenesis.sol";
 
 interface RoundVm {
     function deal(address who, uint256 newBalance) external;
     function warp(uint256 newTimestamp) external;
     function prank(address sender) external;
     function expectRevert(bytes calldata reason) external;
+    function startPrank(address sender) external;
+    function stopPrank() external;
 }
 
 contract MockRoundToken is ERC20 {
@@ -32,12 +36,14 @@ contract MockWrappedNative is ERC20 {
 
 contract MockSequentialHeroes is ERC721 {
     uint16 public totalMinted;
+    mapping(uint256 => uint16) public mintSequence;
 
     constructor() ERC721("Heroes", "HERO") {}
 
     function mint(address recipient) external returns (uint256 tokenId) {
         totalMinted += 1;
         tokenId = totalMinted;
+        mintSequence[tokenId] = totalMinted;
         _mint(recipient, tokenId);
     }
 }
@@ -182,5 +188,52 @@ contract HeroRoundRewardVaultTest {
     function testCannotFundBeforeAnyHeroExists() public {
         vm.expectRevert(bytes("no heroes"));
         vault.fundRound(1 ether);
+    }
+
+    function testRealGenesisMixedTierMintOrderPreservesRewardEntitlement() public {
+        HoodedToken hooded = new HoodedToken(address(this));
+        HoodedGenesis genesis = new HoodedGenesis(
+            address(hooded),
+            address(0xD1),
+            address(0xD2),
+            ALICE,
+            uint64(block.timestamp),
+            bytes32(uint256(1)),
+            "ipfs://heroes/"
+        );
+        HeroRoundRewardVault realVault = new HeroRoundRewardVault(address(hooded), address(genesis), address(0));
+        hooded.approve(address(realVault), type(uint256).max);
+
+        uint256 iconId = _mintRealHero(hooded, genesis, BOB, HoodedGenesis.Tier.Icon);
+        assert(iconId == 2_981 && genesis.mintSequence(iconId) == 11);
+        realVault.fundRound(1_100 ether);
+        assert(realVault.preview(iconId) == 100 ether);
+
+        uint256 recruitId = _mintRealHero(hooded, genesis, CAROL, HoodedGenesis.Tier.Recruit);
+        assert(recruitId == 11 && genesis.mintSequence(recruitId) == 12);
+        assert(realVault.preview(recruitId) == 0);
+        realVault.fundRound(1_200 ether);
+
+        assert(realVault.preview(iconId) == 200 ether);
+        assert(realVault.preview(recruitId) == 100 ether);
+        realVault.claim(iconId);
+        realVault.claim(recruitId);
+        for (uint256 tokenId = 1; tokenId <= 10; ++tokenId) {
+            realVault.claim(tokenId);
+        }
+        assert(realVault.claimLiability() == 0);
+        assert(realVault.totalDelivered() == 2_300 ether);
+    }
+
+    function _mintRealHero(HoodedToken hooded, HoodedGenesis genesis, address member, HoodedGenesis.Tier tier)
+        private
+        returns (uint256 tokenId)
+    {
+        uint256 price = genesis.tierPrices(uint256(tier));
+        hooded.transfer(member, price);
+        vm.startPrank(member);
+        hooded.approve(address(genesis), price);
+        tokenId = genesis.mint(tier);
+        vm.stopPrank();
     }
 }
