@@ -31,6 +31,8 @@ Mainnet-fork tests are opt-in and read-only. Set `RUN_MAINNET_FORK_TESTS=true` w
 
 For Robinhood Chain, keep the QuickNode URL in `.env.local` as `RH_RPC_URL`. Run `pnpm canary:rpc-check` to verify chain ID `4663`, latest-block freshness, and read latency without printing the endpoint. Run `pnpm canary:fork:rh` to perform the same preflight and then execute the opt-in ephemeral fork rehearsal. Neither command accepts a private key or broadcasts.
 
+After setting `LAUNCH_CANARY_OWNER_ADDRESS`, run `pnpm canary:factory-plan:rh` to compile the reviewed factory and calculate its current gas estimate, maximum cost at the reported gas price, owner balance readiness, pending-nonce deployment address, creation/runtime code hashes, and init-code hash. The planner contains no private-key input and has no broadcast path; changing the owner's pending nonce changes the predicted address, so regenerate immediately before any separately approved deployment.
+
 Run `pnpm canary:evidence` to rebuild the Solidity suite and print a reproducible evidence record containing the source commit, compiler settings, ABI hashes, bytecode hashes, and byte sizes. Use `node scripts/canary-build-evidence.mjs --require-clean` for release evidence.
 
 The current Slither review leaves explicit findings for intentional timestamp windows, the caller-only native-asset withdrawal, exact fixed-supply allocation conservation, low-level referral-registry detection, and OpenZeppelin pragma variation. The pull-payment design has a hostile-recipient regression test, and state is cleared before withdrawal. These findings require independent auditor review before a mainnet signature; static analysis is not an audit.

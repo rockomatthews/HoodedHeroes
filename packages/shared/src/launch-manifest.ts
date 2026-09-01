@@ -132,6 +132,13 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
   const endsAt = Date.parse(sale.endsAt);
   const immutableAuthorities = Object.values(metadata.authorities).every((value) => value === false);
   const publicationUrls = [metadata.publication.website, metadata.publication.image, metadata.publication.docs, metadata.publication.x, metadata.publication.telegram, metadata.publication.discord, metadata.publication.farcaster, metadata.publication.support, metadata.publication.header].filter((value): value is string => Boolean(value));
+  const hasPlaceholderMetadata = publicationUrls.some((value) => /pending|placeholder|example\.com/i.test(value));
+  const hasReproducibleBuild = /^[a-f0-9]{7,64}$/i.test(metadata.sourceCommit)
+    && !/^0+$/i.test(metadata.sourceCommit)
+    && /^[a-f0-9]{64}$/i.test(metadata.buildHash)
+    && !/^0+$/i.test(metadata.buildHash)
+    && /^[a-f0-9]{64}$/i.test(metadata.revision.contentHash)
+    && !/^0+$/i.test(metadata.revision.contentHash);
   const monetaryValues = [sale.pricePerToken, sale.minimumRaise, sale.maximumRaise, sale.maximumContributionPerWallet];
   const fixedPriceMatches = metadata.chain === "solana" || (
     isIntegerString(metadata.exactSupply)
@@ -150,8 +157,8 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
     { id: "quote", label: "Approved quote asset", passed: CHAIN_QUOTES[metadata.chain].includes(sale.quoteAsset), detail: "Quote asset must be approved for the selected chain." },
     { id: "fees", label: "Transparent capped fee", passed: fees.saleFeeBps >= 0 && fees.saleFeeBps <= 100 && fees.operationsShareBps + fees.rewardsShareBps + fees.referralShareBps === 10_000, detail: "Sale fee cannot exceed 1% and recipient shares must equal 100%." },
     { id: "liquidity", label: "Permanent liquidity", passed: manifest.liquidity.permanentlyLocked && (metadata.chain === "solana" ? manifest.liquidity.venue === "raydium-cpmm" : manifest.liquidity.venue === "uniswap-v4"), detail: "Liquidity must be permanently locked at the approved chain venue." },
-    { id: "metadata", label: "Distribution metadata", passed: metadata.publication.summary.trim().length >= 20 && metadata.publication.description.trim().length >= 50 && metadata.publication.riskDisclosure.trim().length >= 20 && publicationUrls.every(isHttpUrl), detail: "Complete descriptive, risk, and valid distribution URLs are required." },
-    { id: "build", label: "Reproducible source", passed: /^[a-f0-9]{7,64}$/i.test(metadata.sourceCommit) && /^[a-f0-9]{64}$/i.test(metadata.buildHash) && /^[a-f0-9]{64}$/i.test(metadata.revision.contentHash), detail: "Source commit, build hash, and metadata content hash must be published." },
+    { id: "metadata", label: "Distribution metadata", passed: metadata.publication.summary.trim().length >= 20 && metadata.publication.description.trim().length >= 50 && metadata.publication.riskDisclosure.trim().length >= 20 && publicationUrls.every(isHttpUrl) && !hasPlaceholderMetadata, detail: "Complete descriptive, risk, and valid non-placeholder distribution URLs are required." },
+    { id: "build", label: "Reproducible source", passed: hasReproducibleBuild, detail: "Non-placeholder source commit, build hash, and metadata content hash must be published." },
     { id: "canary", label: "Owner-only sealed canary", passed: manifest.environment === "mainnet-canary" && manifest.canary.creatorAccess === "single-wallet" && manifest.canary.sealedAtCreation && manifest.canary.separatePublicActivation && manifest.canary.mainnetForkRequired && manifest.canary.transactionSimulationRequired, detail: "Mainnet creation stays single-wallet, sealed, fork-tested, simulated, and separate from public activation." },
   ];
 

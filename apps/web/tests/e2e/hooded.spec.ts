@@ -108,15 +108,24 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
   await expect(page.getByText(/Prove conservation across every claim/i)).toBeVisible();
 });
 
-test("Launch Bay validates a tri-chain pro-rata manifest and seals its review package", async ({ page }) => {
+test("Launch Bay leads with HOODED genesis and keeps incomplete evidence blocked", async ({ page }, testInfo) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
   await page.getByRole("button", { name: "Open Launch Bay" }).click();
-  await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Night Signal");
-  await expect(page.getByText("13/13")).toBeVisible();
-  await page.getByRole("button", { name: "Queue owner canary" }).click();
-  await expect(page.getByRole("button", { name: /canary package sealed/i })).toBeVisible();
+  const launchPanel = page.getByRole("dialog", { name: "Launch Bay panel" });
+  await expect(launchPanel).toBeVisible();
+  if (testInfo.project.name === "desktop-chrome") {
+    const panelDimensions = await launchPanel.evaluate((element) => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight }));
+    expect(panelDimensions.scrollHeight).toBeLessThanOrEqual(panelDimensions.clientHeight + 1);
+  }
+  await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("HOODED");
+  await expect(page.getByText("HOODED GENESIS", { exact: true })).toBeVisible();
+  await expect(page.getByText("10/13")).toBeVisible();
+  await expect(page.getByRole("button", { name: "3 GATES BLOCKED" })).toBeDisabled();
+  await page.getByRole("textbox", { name: "Bound owner wallet" }).fill("0x1111111111111111111111111111111111111111");
+  await expect(page.getByText("11/13")).toBeVisible();
   await page.getByRole("button", { name: "SOLANA" }).click();
+  await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Community Launch");
   await expect(page.getByRole("textbox", { name: "Quote asset" })).toHaveValue("SOL");
   await page.getByRole("button", { name: "METADATA" }).click();
   await expect(page.getByText(/Metaplex · Uniswap List/i)).toBeVisible();

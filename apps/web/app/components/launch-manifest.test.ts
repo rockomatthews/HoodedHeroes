@@ -5,9 +5,21 @@ describe("LaunchManifestV1", () => {
   it("accepts a completed sealed HOODED mainnet canary manifest", () => {
     const manifest = structuredClone(HOODED_GENESIS_MANIFEST);
     manifest.metadata.creatorWallet = "0x1111111111111111111111111111111111111111";
+    manifest.metadata.sourceCommit = "a".repeat(40);
+    manifest.metadata.buildHash = "b".repeat(64);
+    manifest.metadata.revision.contentHash = "c".repeat(64);
+    manifest.metadata.publication.image = "ipfs://bafybeigenuinehoodedicon";
     const result = validateLaunchManifest(manifest);
     expect(result.ready).toBe(true);
     expect(result.passed).toBe(13);
+  });
+
+  it("keeps placeholder metadata and build evidence out of canary-ready state", () => {
+    const manifest = structuredClone(HOODED_GENESIS_MANIFEST);
+    manifest.metadata.creatorWallet = "0x1111111111111111111111111111111111111111";
+    const result = validateLaunchManifest(manifest);
+    expect(result.ready).toBe(false);
+    expect(result.checks.filter((check) => !check.passed).map((check) => check.id)).toEqual(expect.arrayContaining(["metadata", "build"]));
   });
 
   it("blocks fee, authority, and allocation escapes", () => {
