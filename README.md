@@ -26,7 +26,7 @@ The application opens in preview mode. The wallet control is deliberately simula
 
 ## Community Sandbox and Launch Bay
 
-Copy `.env.example` to `.env.local`. The sandbox and mainnet-canary preparation are fail-closed. Preparation remains unavailable until the signed canary owner, database, reviewed Vercel snapshots, mainnet RPC, audited factory address, and exact runtime bytecode hash are configured. Even then, the API only returns a decoded unsigned transaction after a successful mainnet simulation. See `docs/community-sandbox.md` and `docs/launch-bay-v1.md`.
+Copy `.env.example` to either ignored `.env.local` or `.env`; `.env.local` takes precedence. The sandbox and mainnet-canary preparation are fail-closed. Preparation remains unavailable until the signed canary owner, database, reviewed Vercel snapshots, mainnet RPC, audited factory address, and exact runtime bytecode hash are configured. Even then, the API only returns a decoded unsigned transaction after a successful mainnet simulation. See `docs/community-sandbox.md` and `docs/launch-bay-v1.md`.
 
 Original source code is offered under AGPL-3.0-or-later. Competitor implementations with incompatible or source-restricted licenses must not be copied into this repository.
 

@@ -7,10 +7,13 @@ const ZERO_ADDRESS = /^0x0{40}$/i;
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 function localValue(name) {
-  if (!existsSync(".env.local")) return undefined;
-  const line = readFileSync(".env.local", "utf8").split(/\r?\n/).find((item) => item.startsWith(`${name}=`));
-  if (!line) return undefined;
-  return line.slice(line.indexOf("=") + 1).trim().replace(/^(['"])(.*)\1$/, "$2");
+  for (const file of [".env.local", ".env"]) {
+    if (!existsSync(file)) continue;
+    const line = readFileSync(file, "utf8").split(/\r?\n/).find((item) => item.startsWith(`${name}=`));
+    if (!line) continue;
+    return line.slice(line.indexOf("=") + 1).trim().replace(/^(['"])(.*)\1$/, "$2");
+  }
+  return undefined;
 }
 
 function run(command, args, options = {}) {
@@ -24,11 +27,11 @@ const rpcUrl = process.env.RH_RPC_URL || localValue("RH_RPC_URL");
 const owner = process.env.LAUNCH_CANARY_OWNER_ADDRESS || localValue("LAUNCH_CANARY_OWNER_ADDRESS");
 const deployer = process.env.RH_FACTORY_DEPLOYER_ADDRESS || localValue("RH_FACTORY_DEPLOYER_ADDRESS") || owner;
 if (!rpcUrl) {
-  console.error("Robinhood factory plan failed: RH_RPC_URL is required in .env.local");
+  console.error("Robinhood factory plan failed: RH_RPC_URL is required in .env.local or .env");
   process.exit(1);
 }
 if (!owner || !ADDRESS.test(owner) || ZERO_ADDRESS.test(owner)) {
-  console.error("Robinhood factory plan failed: LAUNCH_CANARY_OWNER_ADDRESS must be one nonzero EVM wallet in .env.local");
+  console.error("Robinhood factory plan failed: LAUNCH_CANARY_OWNER_ADDRESS must be one nonzero EVM wallet in .env.local or .env");
   process.exit(1);
 }
 if (!deployer || !ADDRESS.test(deployer) || ZERO_ADDRESS.test(deployer)) {
