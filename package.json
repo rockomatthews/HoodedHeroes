@@ -9,6 +9,9 @@
     "lint": "pnpm --filter @hooded/web lint",
     "test": "pnpm -r --if-present test",
     "test:e2e": "pnpm --filter @hooded/web test:e2e",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "canary:rpc-check": "node scripts/robinhood-rpc-preflight.mjs",
+    "canary:fork:rh": "node scripts/robinhood-rpc-preflight.mjs --fork",
+    "canary:evidence": "node scripts/canary-build-evidence.mjs"
   }
 }

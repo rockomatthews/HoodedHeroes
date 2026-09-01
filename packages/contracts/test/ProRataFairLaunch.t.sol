@@ -11,6 +11,16 @@ interface Vm {
     function expectRevert(bytes calldata reason) external;
 }
 
+contract RejectEther {
+    receive() external payable {
+        revert("reject ether");
+    }
+
+    function withdraw(ProRataFairLaunch sale) external {
+        sale.withdrawQuote();
+    }
+}
+
 contract ProRataFairLaunchTest {
     Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
     address internal constant ALICE = address(0xA11CE);
@@ -43,6 +53,13 @@ contract ProRataFairLaunchTest {
         sale.claim();
         assert(token.balanceOf(ALICE) == 500 ether);
         assert(token.balanceOf(BOB) == 500 ether);
+        assert(sale.claimableQuote(PROCEEDS) == 100 ether);
+        vm.prank(PROCEEDS);
+        sale.withdrawQuote();
+        vm.prank(ALICE);
+        sale.withdrawQuote();
+        vm.prank(BOB);
+        sale.withdrawQuote();
         assert(PROCEEDS.balance == 100 ether);
         assert(ALICE.balance == 50 ether);
         assert(BOB.balance == 50 ether);
@@ -58,6 +75,9 @@ contract ProRataFairLaunchTest {
         vm.warp(201);
         vm.prank(ALICE);
         sale.refund();
+        assert(sale.claimableQuote(ALICE) == 10 ether);
+        vm.prank(ALICE);
+        sale.withdrawQuote();
         assert(ALICE.balance == 10 ether);
     }
 
@@ -72,6 +92,32 @@ contract ProRataFairLaunchTest {
         sale.settleFor(ALICE);
         assert(token.balanceOf(ALICE) == 200 ether);
         assert(sale.totalSettledContribution() == 20 ether);
+    }
+
+    function testRejectingRecipientCannotBlockContributorSettlement() public {
+        RejectEther rejectingRecipient = new RejectEther();
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("pull-payments"));
+        ProRataFairLaunch.Config memory config = _config(address(token), 20 ether, 100 ether, 100 ether, 100);
+        config.proceedsRecipient = address(rejectingRecipient);
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        token.transfer(address(sale), 1_000 ether);
+        sale.activate();
+
+        vm.deal(ALICE, 20 ether);
+        vm.warp(100);
+        vm.prank(ALICE);
+        sale.contribute{value: 20 ether}(address(0));
+        vm.warp(201);
+        sale.settleFor(ALICE);
+
+        assert(token.balanceOf(ALICE) == 200 ether);
+        assert(sale.claimableQuote(address(rejectingRecipient)) == 19.8 ether);
+        assert(sale.quoteLiability() == 20 ether);
+        vm.expectRevert(bytes("native transfer failed"));
+        rejectingRecipient.withdraw(sale);
+        assert(sale.claimableQuote(address(rejectingRecipient)) == 19.8 ether);
+        assert(sale.quoteLiability() == 20 ether);
     }
 
     function testUnsoldTokensCannotMoveBeforeEveryContributionSettles() public {
@@ -96,6 +142,8 @@ contract ProRataFairLaunchTest {
         vm.warp(201 + 7 days);
         vm.prank(ALICE);
         sale.refund();
+        vm.prank(ALICE);
+        sale.withdrawQuote();
         assert(ALICE.balance == 25 ether);
     }
 

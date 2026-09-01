@@ -10,7 +10,7 @@ Launch Bay v1 is a fixed-price, timed, pro-rata fair-launch mainnet-canary candi
 - Public launch list/detail/validation/simulation endpoints.
 - Signed-wallet owner-gated canary persistence and a fail-closed transaction-preparation endpoint.
 - `FixedSupplyLaunchToken`, `LaunchFactory`, `ProRataFairLaunch`, and `ImmutableReferralRegistry` contracts.
-- Permissionless failed-launch refunds, oversubscription refunds, incident-pause-to-refund behavior, settlement on behalf of inactive contributors, immutable recipients, and no owner withdrawal. Unsold tokens cannot move until every contribution has settled.
+- Permissionless failed-launch refunds, oversubscription refunds, incident-pause-to-refund behavior, settlement on behalf of inactive contributors, immutable recipients, and no owner withdrawal. Quote proceeds, fees, and refunds use recipient-owned pull balances, so a recipient that rejects ETH cannot block anyone else's settlement. Unsold tokens cannot move until every contribution has settled.
 - Owner-only unsigned creation and activation preparation routes with exact factory/sale bytecode checks, immutable-owner readback, manifest-hash checks, gas estimation, and required mainnet `eth_call` simulation.
 
 ## Deliberately disabled
@@ -28,6 +28,12 @@ The bundled mainnet-canary manifest fixes supply at 1,000,000,000 HOODED and enc
 The canary factory has one immutable creator. Every new sale is sealed at creation and requires a separate creator-signed activation transaction. A later public release uses a newly reviewed factory version; the canary factory never becomes permissionless.
 
 Mainnet-fork tests are opt-in and read-only. Set `RUN_MAINNET_FORK_TESTS=true` with the relevant RPC URLs, then run the Foundry suite. Fork tests deploy only into the local ephemeral fork and never broadcast or spend funds.
+
+For Robinhood Chain, keep the QuickNode URL in `.env.local` as `RH_RPC_URL`. Run `pnpm canary:rpc-check` to verify chain ID `4663`, latest-block freshness, and read latency without printing the endpoint. Run `pnpm canary:fork:rh` to perform the same preflight and then execute the opt-in ephemeral fork rehearsal. Neither command accepts a private key or broadcasts.
+
+Run `pnpm canary:evidence` to rebuild the Solidity suite and print a reproducible evidence record containing the source commit, compiler settings, ABI hashes, bytecode hashes, and byte sizes. Use `node scripts/canary-build-evidence.mjs --require-clean` for release evidence.
+
+The current Slither review leaves explicit findings for intentional timestamp windows, the caller-only native-asset withdrawal, exact fixed-supply allocation conservation, low-level referral-registry detection, and OpenZeppelin pragma variation. The pull-payment design has a hostile-recipient regression test, and state is cleared before withdrawal. These findings require independent auditor review before a mainnet signature; static analysis is not an audit.
 
 ## Metadata cost discipline
 

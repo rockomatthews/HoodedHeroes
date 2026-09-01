@@ -37,10 +37,12 @@ contract ProRataFairLaunch is ReentrancyGuard {
     uint256 public totalContributed;
     uint256 public totalSettledContribution;
     uint256 public totalTokensClaimed;
+    uint256 public quoteLiability;
     bool public activated;
     bool public paused;
     bool public cancelled;
     mapping(address => uint256) public contributed;
+    mapping(address => uint256) public claimableQuote;
     mapping(address => address) public referrerOf;
     mapping(address => bool) public settled;
 
@@ -48,6 +50,8 @@ contract ProRataFairLaunch is ReentrancyGuard {
     event Activated(address indexed creator);
     event Claimed(address indexed contributor, uint256 tokens, uint256 acceptedQuote, uint256 refundedQuote);
     event Refunded(address indexed contributor, uint256 amount);
+    event QuoteAccrued(address indexed recipient, uint256 amount);
+    event QuoteWithdrawn(address indexed recipient, uint256 amount);
     event PauseChanged(bool paused);
     event Cancelled();
     event UnsoldSwept(uint256 amount, address indexed recipient);
@@ -158,9 +162,9 @@ contract ProRataFairLaunch is ReentrancyGuard {
         uint256 accepted =
             totalContributed > maximumRaise ? maximumRaise * contribution / totalContributed : contribution;
         uint256 refundAmount = contribution - accepted;
-        uint256 fee = accepted * saleFeeBps / BPS;
-        uint256 referralShare = fee * 2_000 / BPS;
-        uint256 operationsShare = fee * 5_000 / BPS;
+        uint256 fee = Math.mulDiv(accepted, saleFeeBps, BPS);
+        uint256 referralShare = Math.mulDiv(fee, 2_000, BPS);
+        uint256 operationsShare = Math.mulDiv(fee, 5_000, BPS);
         uint256 rewardsShare = fee - operationsShare - referralShare;
         address referrer = referrerOf[contributor];
         if (!_isVerifiedReferrer(referrer)) {
@@ -170,11 +174,11 @@ contract ProRataFairLaunch is ReentrancyGuard {
 
         totalTokensClaimed += tokens;
         saleToken.safeTransfer(contributor, tokens);
-        _payQuote(proceedsRecipient, accepted - fee);
-        _payQuote(operationsRecipient, operationsShare);
-        _payQuote(rewardsRecipient, rewardsShare);
-        if (referralShare > 0) _payQuote(referrer, referralShare);
-        if (refundAmount > 0) _payQuote(contributor, refundAmount);
+        _accrueQuote(proceedsRecipient, accepted - fee);
+        _accrueQuote(operationsRecipient, operationsShare);
+        _accrueQuote(rewardsRecipient, rewardsShare);
+        if (referralShare > 0) _accrueQuote(referrer, referralShare);
+        if (refundAmount > 0) _accrueQuote(contributor, refundAmount);
         emit Claimed(contributor, tokens, accepted, refundAmount);
     }
 
@@ -186,8 +190,18 @@ contract ProRataFairLaunch is ReentrancyGuard {
         require(amount > 0, "no contribution");
         settled[msg.sender] = true;
         totalSettledContribution += amount;
-        _payQuote(msg.sender, amount);
+        _accrueQuote(msg.sender, amount);
         emit Refunded(msg.sender, amount);
+    }
+
+    /// @notice Withdraws only the quote assets accrued to the caller.
+    function withdrawQuote() external nonReentrant returns (uint256 amount) {
+        amount = claimableQuote[msg.sender];
+        require(amount > 0, "nothing claimable");
+        claimableQuote[msg.sender] = 0;
+        quoteLiability -= amount;
+        _payQuote(msg.sender, amount);
+        emit QuoteWithdrawn(msg.sender, amount);
     }
 
     function setPaused(bool value) external {
@@ -246,6 +260,13 @@ contract ProRataFairLaunch is ReentrancyGuard {
         (bool ok, bytes memory data) =
             referralRegistry.staticcall(abi.encodeWithSignature("isVerified(address)", referrer));
         return ok && data.length == 32 && abi.decode(data, (bool));
+    }
+
+    function _accrueQuote(address recipient, uint256 amount) private {
+        if (amount == 0) return;
+        claimableQuote[recipient] += amount;
+        quoteLiability += amount;
+        emit QuoteAccrued(recipient, amount);
     }
 
     function _payQuote(address recipient, uint256 amount) internal {

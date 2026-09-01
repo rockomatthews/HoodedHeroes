@@ -5,6 +5,7 @@
 - Exact supply is fully accounted for at creation.
 - No post-construction mint, freeze, blacklist, transfer-tax, or arbitrary upgrade authority exists.
 - Quote assets and sale tokens are conserved across every contribution, claim, refund, fee, and unsold-token path.
+- Sale proceeds, fee shares, and refunds accrue to recipient-owned pull balances. A reverting recipient may block only its own withdrawal, never another wallet's settlement.
 - Each contributor settles once.
 - Anyone can settle a successful allocation for its contributor, and unsold tokens remain locked until all contributions settle.
 - The protocol fee never exceeds 1% and recipients are visible before signing.

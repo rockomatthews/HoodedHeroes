@@ -9,7 +9,12 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 /// @notice Genesis membership contract. One primary mint per wallet; tier caps total exactly 3,000.
 /// @dev Metadata reveal and mint activation should sit behind a deployment timelock in production.
 contract HoodedGenesis is ERC721, ReentrancyGuard {
-    enum Tier { Recruit, Specialist, Vanguard, Icon }
+    enum Tier {
+        Recruit,
+        Specialist,
+        Vanguard,
+        Icon
+    }
 
     uint16[4] public tierCaps = [2200, 600, 180, 20];
     uint256[4] public tierPrices = [uint256(100_000 ether), 250_000 ether, 500_000 ether, 1_000_000 ether];
@@ -36,6 +41,13 @@ contract HoodedGenesis is ERC721, ReentrancyGuard {
         require(!usedPrimaryMint[msg.sender], "one primary mint");
         require(tierMinted[tierIndex] < tierCaps[tierIndex], "tier sold out");
         uint256 price = tierPrices[tierIndex];
+
+        usedPrimaryMint[msg.sender] = true;
+        tierMinted[tierIndex] += 1;
+        totalMinted += 1;
+        tokenId = totalMinted;
+        originTier[tokenId] = tier;
+
         require(hoodedToken.transferFrom(msg.sender, address(this), price), "payment failed");
 
         uint256 burnAmount = price * 40 / 100;
@@ -43,11 +55,6 @@ contract HoodedGenesis is ERC721, ReentrancyGuard {
         require(hoodedToken.transfer(seasonalRewards, price * 40 / 100), "reward transfer failed");
         require(hoodedToken.transfer(daoTimelock, price * 20 / 100), "treasury transfer failed");
 
-        usedPrimaryMint[msg.sender] = true;
-        tierMinted[tierIndex] += 1;
-        totalMinted += 1;
-        tokenId = totalMinted;
-        originTier[tokenId] = tier;
         _safeMint(msg.sender, tokenId);
         emit GenesisMinted(msg.sender, tokenId, tier, price);
     }
