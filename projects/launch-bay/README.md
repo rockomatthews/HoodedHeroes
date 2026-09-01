@@ -12,12 +12,14 @@ This folder is the project's contribution front door. Production code remains in
 
 ## Current milestone
 
-`v0.1.0-testnet` is an implementation foundation, not an audited release. Robinhood Chain and Base are testnet candidates. Solana is a visible adapter backlog and must not be represented as production-ready.
+`v1.1.0-mainnet-candidate` is the Robinhood Chain implementation and evidence foundation. It uses local tests, Robinhood Chain mainnet forks, owner-only lab rehearsals, unsigned simulations, and independent review rather than public testnets. It is not an audited or deployed release. Base and Solana remain visible backlogs and must not be represented as production-ready.
+
+The two rehearsal identities are permanently reserved as `HOODED LAB 01 / HLAB1` and `HOODED LAB 02 / HLAB2`. Both are experimental, have no promised value, and create no public liquidity pool.
 
 ## Contribution contract
 
 1. Choose an issue or Code Bazaar bounty.
-2. Work only from an approved HOODED commit in the isolated sandbox.
+2. Link a current Genesis Hero wallet to GitHub and work only from the approved private-repository commit in the isolated sandbox.
 3. Add or strengthen tests before changing protocol behavior.
 4. Attach the diff, SBOM, build hash, test transcript, and threat-model impact.
 5. Sign the commit and include DCO sign-off.

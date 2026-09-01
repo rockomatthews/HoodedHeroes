@@ -9,6 +9,8 @@ interface Vm {
     function warp(uint256 newTimestamp) external;
     function prank(address sender) external;
     function expectRevert(bytes calldata reason) external;
+    function addr(uint256 privateKey) external returns (address);
+    function sign(uint256 privateKey, bytes32 digest) external returns (uint8 v, bytes32 r, bytes32 s);
 }
 
 contract RejectEther {
@@ -30,6 +32,8 @@ contract ProRataFairLaunchTest {
     address internal constant OPERATIONS = address(0xD2);
     address internal constant REWARDS = address(0xD3);
     address internal constant UNSOLD = address(0xD4);
+    address internal constant LIQUIDITY = address(0xD5);
+    uint256 internal constant SIGNER_KEY = 0xBEEF;
 
     function testOversubscriptionIsProRataAndRefundsRemainder() public {
         (FixedSupplyLaunchToken token, ProRataFairLaunch sale) = _nativeSale(20 ether, 100 ether, 100 ether, 0);
@@ -155,6 +159,76 @@ contract ProRataFairLaunchTest {
         new ProRataFairLaunch(config);
     }
 
+    function testEligibilityPermitIsLaunchBoundAndCannotReplay() public {
+        uint256 contributorKey = 0xA11CE;
+        address signer = vm.addr(SIGNER_KEY);
+        address contributor = vm.addr(contributorKey);
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("eligible"));
+        ProRataFairLaunch.Config memory config = _config(address(token), 1 ether, 100 ether, 100 ether, 0);
+        config.eligibilitySigner = signer;
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        token.transfer(address(sale), 1_000 ether);
+        sale.activate();
+        vm.deal(contributor, 10 ether);
+        vm.warp(100);
+        vm.expectRevert(bytes("eligibility allowance"));
+        vm.prank(contributor);
+        sale.contribute{value: 1 ether}(address(0));
+
+        uint256 allowance = 10 ether;
+        uint256 nonce = 7;
+        uint256 deadline = 150;
+        bytes memory signature = _eligibilitySignature(sale, contributor, allowance, nonce, deadline);
+        vm.prank(contributor);
+        sale.contributeWithEligibility{value: 1 ether}(address(0), allowance, nonce, deadline, signature);
+        vm.expectRevert(bytes("eligibility replay"));
+        vm.prank(contributor);
+        sale.contributeWithEligibility{value: 1 ether}(address(0), allowance, nonce, deadline, signature);
+    }
+
+    function testLiquidityAndDaoProceedsAreSeparatedBeforeWithdrawal() public {
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("split"));
+        ProRataFairLaunch.Config memory config = _config(address(token), 100 ether, 100 ether, 100 ether, 75);
+        config.liquidityRecipient = LIQUIDITY;
+        config.liquidityShareBps = 3_750;
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        token.transfer(address(sale), 1_000 ether);
+        sale.activate();
+        vm.deal(ALICE, 100 ether);
+        vm.warp(100);
+        vm.prank(ALICE);
+        sale.contribute{value: 100 ether}(address(0));
+        vm.warp(201);
+        sale.settleFor(ALICE);
+        assert(sale.claimableQuote(LIQUIDITY) == 37.5 ether);
+        assert(sale.claimableQuote(PROCEEDS) == 61.75 ether);
+        assert(sale.claimableQuote(OPERATIONS) == 0.375 ether);
+        assert(sale.claimableQuote(REWARDS) == 0.375 ether);
+    }
+
+    function testUnsoldSupplyCanBePermanentlyBurned() public {
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("burn-unsold"));
+        ProRataFairLaunch.Config memory config = _config(address(token), 1 ether, 100 ether, 100 ether, 0);
+        config.burnUnsold = true;
+        config.unsoldRecipient = address(0);
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        token.transfer(address(sale), 1_000 ether);
+        sale.activate();
+        vm.deal(ALICE, 20 ether);
+        vm.warp(100);
+        vm.prank(ALICE);
+        sale.contribute{value: 20 ether}(address(0));
+        vm.warp(201);
+        sale.settleFor(ALICE);
+        vm.warp(401);
+        sale.sweepUnsold();
+        assert(token.totalSupply() == 200 ether);
+        assert(token.balanceOf(address(sale)) == 0);
+    }
+
     function testSaleStartsSealedAndOnlyCreatorCanActivate() public {
         FixedSupplyLaunchToken token =
             new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("sealed-manifest"));
@@ -195,6 +269,29 @@ contract ProRataFairLaunchTest {
         sale.activate();
     }
 
+    function _eligibilitySignature(
+        ProRataFairLaunch sale,
+        address contributor,
+        uint256 allowance,
+        uint256 nonce,
+        uint256 deadline
+    ) private returns (bytes memory) {
+        bytes32 domain = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("HOODED Launch Eligibility")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(sale)
+            )
+        );
+        bytes32 structHash =
+            keccak256(abi.encode(sale.ELIGIBILITY_TYPEHASH(), contributor, address(sale), allowance, nonce, deadline));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(SIGNER_KEY, keccak256(abi.encodePacked("\x19\x01", domain, structHash)));
+        return abi.encodePacked(r, s, v);
+    }
+
     function _config(address token, uint256 minRaise, uint256 maxRaise, uint256 cap, uint16 feeBps)
         internal
         view
@@ -215,10 +312,14 @@ contract ProRataFairLaunchTest {
             creator: address(this),
             securityCouncil: COUNCIL,
             proceedsRecipient: PROCEEDS,
+            liquidityRecipient: address(0),
             operationsRecipient: OPERATIONS,
             rewardsRecipient: REWARDS,
             referralRegistry: address(0),
-            unsoldRecipient: UNSOLD
+            unsoldRecipient: UNSOLD,
+            eligibilitySigner: address(0),
+            liquidityShareBps: 0,
+            burnUnsold: false
         });
     }
 }

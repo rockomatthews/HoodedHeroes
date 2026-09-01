@@ -1,10 +1,11 @@
-import { HOODED_GENESIS_MANIFEST } from "@hooded/shared";
+import { HLAB1_MANIFEST, HLAB2_MANIFEST, HOODED_GENESIS_MANIFEST } from "@hooded/shared";
 import { databaseConfigured, db } from "@/lib/server/database";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   if (!databaseConfigured()) {
-    if (projectId === HOODED_GENESIS_MANIFEST.metadata.projectId) return Response.json(HOODED_GENESIS_MANIFEST);
+    const bundled = [HOODED_GENESIS_MANIFEST, HLAB1_MANIFEST, HLAB2_MANIFEST].find((launch) => launch.metadata.projectId === projectId);
+    if (bundled) return Response.json(bundled);
     return Response.json({ error: "Launch not found" }, { status: 404 });
   }
   const sql = db();

@@ -151,10 +151,14 @@ contract HeroRoundRewardVaultTest {
             creator: address(this),
             securityCouncil: address(0xC0),
             proceedsRecipient: address(0xD1),
+            liquidityRecipient: address(0),
             operationsRecipient: address(0xD2),
             rewardsRecipient: address(nativeVault),
             referralRegistry: address(0),
-            unsoldRecipient: address(0xD4)
+            unsoldRecipient: address(0xD4),
+            eligibilitySigner: address(0),
+            liquidityShareBps: 0,
+            burnUnsold: false
         });
         ProRataFairLaunch sale = new ProRataFairLaunch(config);
         saleToken.transfer(address(sale), 1_000 ether);

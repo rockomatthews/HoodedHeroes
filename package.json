@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@11.21.0",
+  "devDependencies": {
+    "@vercel/sandbox": "1.10.2"
+  },
   "scripts": {
     "dev": "pnpm --filter @hooded/web dev",
     "build": "pnpm --filter @hooded/web build",
@@ -13,6 +16,11 @@
     "canary:rpc-check": "node scripts/robinhood-rpc-preflight.mjs",
     "canary:fork:rh": "node scripts/robinhood-rpc-preflight.mjs --fork",
     "canary:factory-plan:rh": "node scripts/canary-factory-plan.mjs",
-    "canary:evidence": "node scripts/canary-build-evidence.mjs"
+    "canary:evidence": "node scripts/canary-build-evidence.mjs",
+    "heroes:generate": "node scripts/generate-hero-collection.mjs",
+    "sandbox:snapshots:plan": "node scripts/create-sandbox-snapshots.mjs",
+    "production:factory-plan:rh": "node scripts/production-factory-plan.mjs",
+    "production:uniswap-readback:rh": "node scripts/robinhood-uniswap-readback.mjs",
+    "production:heroes-plan:rh": "node scripts/hero-genesis-plan.mjs"
   }
 }

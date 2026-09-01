@@ -1,0 +1,17 @@
+{
+  "schema": "hooded-media-package/v1",
+  "brand": "HOODED",
+  "alt": "Original black-hooded HOODED society emblem and comic-book hero portal",
+  "rights": "Original HOODED artwork; no Robinhood or third-party comic franchise marks",
+  "assets": [
+    { "file": "icon-2048.png", "mime": "image/png", "width": 2048, "height": 2048, "sha256": "d9b5d370a8144b3ff8aa8d8a923bbf17013a00fccf87310c9ae1d0577ece08bc" },
+    { "file": "icon-1000.png", "mime": "image/png", "width": 1000, "height": 1000, "sha256": "cae231b027dd5b4663fb8a9c8ab389857ba401dc301767cd23db2b7bb59d768f" },
+    { "file": "icon-1000.webp", "mime": "image/webp", "width": 1000, "height": 1000, "sha256": "f6e0f79f6cfb99b7c5d2083c6a304ebc3e03d4e7c9c8c9519a6677895cb30a5e" },
+    { "file": "icon-512.png", "mime": "image/png", "width": 512, "height": 512, "sha256": "4115a38fdcf6416cb46ae5e55b308d985d64dffd1b5eb99a70a9341ed8f1b1ac" },
+    { "file": "icon-512.webp", "mime": "image/webp", "width": 512, "height": 512, "sha256": "cd116652106ca9acbdad3b89ded78839ef6f52804df30cf8400bf1cfd16de70c" },
+    { "file": "header-1500x500.png", "mime": "image/png", "width": 1500, "height": 500, "sha256": "13e096cd1e3ded2f6c9d7063419e857dd8736f088ce1938e4749246edc713251" },
+    { "file": "og-1200x630.png", "mime": "image/png", "width": 1200, "height": 630, "sha256": "496ba6d6f991f437a1860ff563e7ed90782acf43080cabee5a48782aae80e17f" }
+  ],
+  "immutableCopies": { "ipfs": null, "arweave": null },
+  "publicationStatus": "generated-not-submitted"
+}

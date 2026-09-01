@@ -5,15 +5,19 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /// @notice Timed fixed-price launch with pro-rata oversubscription, permissionless refunds, and no owner withdrawal.
-contract ProRataFairLaunch is ReentrancyGuard {
+contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
     using SafeERC20 for IERC20;
 
     uint16 public constant MAX_FEE_BPS = 100;
     uint16 public constant BPS = 10_000;
     uint256 public constant PRICE_SCALE = 1 ether;
     uint64 public constant INCIDENT_GRACE_PERIOD = 7 days;
+    bytes32 public constant ELIGIBILITY_TYPEHASH =
+        keccak256("Eligibility(address contributor,address launch,uint256 allowance,uint256 nonce,uint256 deadline)");
 
     IERC20 public immutable saleToken;
     IERC20 public immutable quoteToken;
@@ -29,10 +33,14 @@ contract ProRataFairLaunch is ReentrancyGuard {
     address public immutable creator;
     address public immutable securityCouncil;
     address public immutable proceedsRecipient;
+    address public immutable liquidityRecipient;
     address public immutable operationsRecipient;
     address public immutable rewardsRecipient;
     address public immutable referralRegistry;
     address public immutable unsoldRecipient;
+    address public immutable eligibilitySigner;
+    uint16 public immutable liquidityShareBps;
+    bool public immutable burnUnsold;
 
     uint256 public totalContributed;
     uint256 public totalSettledContribution;
@@ -45,6 +53,8 @@ contract ProRataFairLaunch is ReentrancyGuard {
     mapping(address => uint256) public claimableQuote;
     mapping(address => address) public referrerOf;
     mapping(address => bool) public settled;
+    mapping(address => uint256) public authorizedAllowance;
+    mapping(address => mapping(uint256 => bool)) public usedEligibilityNonce;
 
     event Contributed(address indexed contributor, uint256 amount, address indexed referrer);
     event Activated(address indexed creator);
@@ -55,6 +65,8 @@ contract ProRataFairLaunch is ReentrancyGuard {
     event PauseChanged(bool paused);
     event Cancelled();
     event UnsoldSwept(uint256 amount, address indexed recipient);
+    event EligibilityAuthorized(address indexed contributor, uint256 allowance, uint256 indexed nonce);
+    event UnsoldBurned(uint256 amount);
 
     struct Config {
         address saleToken;
@@ -71,13 +83,17 @@ contract ProRataFairLaunch is ReentrancyGuard {
         address creator;
         address securityCouncil;
         address proceedsRecipient;
+        address liquidityRecipient;
         address operationsRecipient;
         address rewardsRecipient;
         address referralRegistry;
         address unsoldRecipient;
+        address eligibilitySigner;
+        uint16 liquidityShareBps;
+        bool burnUnsold;
     }
 
-    constructor(Config memory config) {
+    constructor(Config memory config) EIP712("HOODED Launch Eligibility", "1") {
         require(config.saleToken != address(0), "zero sale token");
         require(config.saleAllocation > 0, "zero allocation");
         require(config.pricePerToken > 0, "zero price");
@@ -89,9 +105,12 @@ contract ProRataFairLaunch is ReentrancyGuard {
         require(config.walletCap > 0, "zero cap");
         require(config.startsAt < config.endsAt && config.claimDeadline > config.endsAt, "invalid time");
         require(config.saleFeeBps <= MAX_FEE_BPS, "fee cap");
+        require(uint256(config.saleFeeBps) + config.liquidityShareBps <= BPS, "proceeds overflow");
         require(config.creator != address(0) && config.securityCouncil != address(0), "zero authority");
         require(config.proceedsRecipient != address(0) && config.operationsRecipient != address(0), "zero recipient");
-        require(config.rewardsRecipient != address(0) && config.unsoldRecipient != address(0), "zero recipient");
+        require(config.rewardsRecipient != address(0), "zero recipient");
+        require(config.liquidityShareBps == 0 || config.liquidityRecipient != address(0), "zero liquidity recipient");
+        require(config.burnUnsold || config.unsoldRecipient != address(0), "zero unsold recipient");
         saleToken = IERC20(config.saleToken);
         quoteToken = IERC20(config.quoteToken);
         saleAllocation = config.saleAllocation;
@@ -106,10 +125,14 @@ contract ProRataFairLaunch is ReentrancyGuard {
         creator = config.creator;
         securityCouncil = config.securityCouncil;
         proceedsRecipient = config.proceedsRecipient;
+        liquidityRecipient = config.liquidityRecipient;
         operationsRecipient = config.operationsRecipient;
         rewardsRecipient = config.rewardsRecipient;
         referralRegistry = config.referralRegistry;
         unsoldRecipient = config.unsoldRecipient;
+        eligibilitySigner = config.eligibilitySigner;
+        liquidityShareBps = config.liquidityShareBps;
+        burnUnsold = config.burnUnsold;
     }
 
     receive() external payable {
@@ -118,6 +141,18 @@ contract ProRataFairLaunch is ReentrancyGuard {
 
     function contribute(address referrer) public payable nonReentrant {
         require(address(quoteToken) == address(0), "ERC20 quote");
+        _recordContribution(msg.sender, msg.value, referrer);
+    }
+
+    function contributeWithEligibility(
+        address referrer,
+        uint256 allowance,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external payable nonReentrant {
+        require(address(quoteToken) == address(0), "ERC20 quote");
+        _authorize(msg.sender, allowance, nonce, deadline, signature);
         _recordContribution(msg.sender, msg.value, referrer);
     }
 
@@ -134,6 +169,21 @@ contract ProRataFairLaunch is ReentrancyGuard {
     function contributeToken(uint256 amount, address referrer) external nonReentrant {
         require(address(quoteToken) != address(0), "native quote");
         require(amount > 0, "zero contribution");
+        quoteToken.safeTransferFrom(msg.sender, address(this), amount);
+        _recordContribution(msg.sender, amount, referrer);
+    }
+
+    function contributeTokenWithEligibility(
+        uint256 amount,
+        address referrer,
+        uint256 allowance,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external nonReentrant {
+        require(address(quoteToken) != address(0), "native quote");
+        require(amount > 0, "zero contribution");
+        _authorize(msg.sender, allowance, nonce, deadline, signature);
         quoteToken.safeTransferFrom(msg.sender, address(this), amount);
         _recordContribution(msg.sender, amount, referrer);
     }
@@ -163,6 +213,7 @@ contract ProRataFairLaunch is ReentrancyGuard {
             totalContributed > maximumRaise ? maximumRaise * contribution / totalContributed : contribution;
         uint256 refundAmount = contribution - accepted;
         uint256 fee = Math.mulDiv(accepted, saleFeeBps, BPS);
+        uint256 liquidityShare = Math.mulDiv(accepted, liquidityShareBps, BPS);
         uint256 referralShare = Math.mulDiv(fee, 2_000, BPS);
         uint256 operationsShare = Math.mulDiv(fee, 5_000, BPS);
         uint256 rewardsShare = fee - operationsShare - referralShare;
@@ -174,7 +225,8 @@ contract ProRataFairLaunch is ReentrancyGuard {
 
         totalTokensClaimed += tokens;
         saleToken.safeTransfer(contributor, tokens);
-        _accrueQuote(proceedsRecipient, accepted - fee);
+        _accrueQuote(proceedsRecipient, accepted - fee - liquidityShare);
+        _accrueQuote(liquidityRecipient, liquidityShare);
         _accrueQuote(operationsRecipient, operationsShare);
         _accrueQuote(rewardsRecipient, rewardsShare);
         if (referralShare > 0) _accrueQuote(referrer, referralShare);
@@ -223,8 +275,14 @@ contract ProRataFairLaunch is ReentrancyGuard {
         require(totalSettledContribution == totalContributed, "unsettled contributions");
         uint256 balance = saleToken.balanceOf(address(this));
         require(balance > 0, "nothing to sweep");
-        saleToken.safeTransfer(unsoldRecipient, balance);
-        emit UnsoldSwept(balance, unsoldRecipient);
+        if (burnUnsold) {
+            (bool ok,) = address(saleToken).call(abi.encodeWithSignature("burn(uint256)", balance));
+            require(ok, "burn failed");
+            emit UnsoldBurned(balance);
+        } else {
+            saleToken.safeTransfer(unsoldRecipient, balance);
+            emit UnsoldSwept(balance, unsoldRecipient);
+        }
     }
 
     function preview(address contributor)
@@ -249,10 +307,32 @@ contract ProRataFairLaunch is ReentrancyGuard {
         require(activated && !cancelled && !paused, "not accepting");
         require(block.timestamp >= startsAt && block.timestamp <= endsAt, "outside window");
         require(amount > 0 && contributed[contributor] + amount <= walletCap, "wallet cap");
+        if (eligibilitySigner != address(0)) {
+            require(contributed[contributor] + amount <= authorizedAllowance[contributor], "eligibility allowance");
+        }
         if (referrerOf[contributor] == address(0) && referrer != contributor) referrerOf[contributor] = referrer;
         contributed[contributor] += amount;
         totalContributed += amount;
         emit Contributed(contributor, amount, referrerOf[contributor]);
+    }
+
+    function _authorize(
+        address contributor,
+        uint256 allowance,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) private {
+        require(eligibilitySigner != address(0), "eligibility disabled");
+        require(block.timestamp <= deadline, "eligibility expired");
+        require(!usedEligibilityNonce[contributor][nonce], "eligibility replay");
+        bytes32 structHash =
+            keccak256(abi.encode(ELIGIBILITY_TYPEHASH, contributor, address(this), allowance, nonce, deadline));
+        address signer = ECDSA.recover(_hashTypedDataV4(structHash), signature);
+        require(signer == eligibilitySigner, "invalid eligibility");
+        usedEligibilityNonce[contributor][nonce] = true;
+        if (allowance > authorizedAllowance[contributor]) authorizedAllowance[contributor] = allowance;
+        emit EligibilityAuthorized(contributor, allowance, nonce);
     }
 
     function _isVerifiedReferrer(address referrer) internal view returns (bool) {

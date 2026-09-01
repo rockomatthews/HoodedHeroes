@@ -2,9 +2,9 @@ import { createPublicClient, encodeFunctionData, getAddress, http, isAddress, ke
 import { z } from "zod";
 import { canonicalJson, validateLaunchManifest, type LaunchManifestV1 } from "@hooded/shared";
 import { canaryModeEnabled, configuredCanaryOwner, isLaunchCanaryOwner } from "@/lib/server/launch-canary";
-import { assertSameOrigin, publicError, requireIdempotencyKey } from "@/lib/server/request-security";
+import { assertSameOrigin, publicError, requireDatabaseRateLimit, requireIdempotencyKey } from "@/lib/server/request-security";
 import { getSocietySession } from "@/lib/server/session";
-import { metadataRevisionMatches } from "@/lib/server/manifest-integrity";
+import { immutableMetadataCoreMatches, metadataRevisionMatches, metadataRevisionSignatureValid } from "@/lib/server/manifest-integrity";
 
 export const runtime = "nodejs";
 
@@ -18,6 +18,7 @@ const executionSchema = z.object({
   referralRegistry: address,
   unsoldRecipient: address,
   liquidityRecipient: address,
+  eligibilitySigner: address,
   creatorVestingRecipient: address,
   rewardsAllocationRecipient: address,
   treasuryRecipient: address,
@@ -30,8 +31,9 @@ const saleComponents = [
   { name: "minimumRaise", type: "uint256" }, { name: "maximumRaise", type: "uint256" }, { name: "walletCap", type: "uint256" },
   { name: "startsAt", type: "uint64" }, { name: "endsAt", type: "uint64" }, { name: "claimDeadline", type: "uint64" },
   { name: "saleFeeBps", type: "uint16" }, { name: "creator", type: "address" }, { name: "securityCouncil", type: "address" },
-  { name: "proceedsRecipient", type: "address" }, { name: "operationsRecipient", type: "address" }, { name: "rewardsRecipient", type: "address" },
-  { name: "referralRegistry", type: "address" }, { name: "unsoldRecipient", type: "address" },
+  { name: "proceedsRecipient", type: "address" }, { name: "liquidityRecipient", type: "address" }, { name: "operationsRecipient", type: "address" }, { name: "rewardsRecipient", type: "address" },
+  { name: "referralRegistry", type: "address" }, { name: "unsoldRecipient", type: "address" }, { name: "eligibilitySigner", type: "address" },
+  { name: "liquidityShareBps", type: "uint16" }, { name: "burnUnsold", type: "bool" },
 ] as const;
 const tokenComponents = [{ name: "name", type: "string" }, { name: "symbol", type: "string" }, { name: "supply", type: "uint256" }, { name: "manifestHash", type: "bytes32" }] as const;
 const factoryAbi = [{
@@ -76,13 +78,14 @@ export async function POST(request: Request) {
     const idempotencyKey = requireIdempotencyKey(request);
     const session = await getSocietySession();
     if (!session || !isLaunchCanaryOwner(session.wallet) || !canaryModeEnabled()) return Response.json({ error: "Owner-only mainnet canary preparation is disabled" }, { status: 403 });
+    await requireDatabaseRateLimit("lab-transaction-prepare", session.wallet, 20, 3_600);
     const owner = configuredCanaryOwner();
     if (!owner) return Response.json({ error: "The canary owner is not configured" }, { status: 503 });
     const { manifest, execution } = requestSchema.parse(await request.json());
     const validation = validateLaunchManifest(manifest);
     if (!validation.ready) return Response.json({ error: "Manifest is blocked", validation }, { status: 422 });
-    if (!metadataRevisionMatches(manifest)) return Response.json({ error: "Metadata revision hash does not match the canonical publication record" }, { status: 422 });
-    if (manifest.environment !== "mainnet-canary" || manifest.lifecycle !== "canary-ready") return Response.json({ error: "The manifest has not reached the owner-only canary-ready gate", validation }, { status: 403 });
+    if (!metadataRevisionMatches(manifest) || !immutableMetadataCoreMatches(manifest.metadata) || !await metadataRevisionSignatureValid(manifest)) return Response.json({ error: "Metadata evidence is invalid" }, { status: 422 });
+    if (manifest.metadata.chain !== "robinhood" || manifest.launchClass !== "lab" || manifest.environment !== "mainnet-canary" || manifest.lifecycle !== "canary-ready") return Response.json({ error: "Only owner-only Robinhood Chain lab manifests at canary-ready may be prepared", validation }, { status: 403 });
     if (manifest.metadata.creatorWallet.toLowerCase() !== owner.toLowerCase()) return Response.json({ error: "Manifest creator does not match the canary owner" }, { status: 403 });
 
     const network = chainConfiguration(manifest.metadata.chain);
@@ -105,12 +108,12 @@ export async function POST(request: Request) {
       minimumRaise: BigInt(manifest.sale.minimumRaise), maximumRaise: BigInt(manifest.sale.maximumRaise), walletCap: BigInt(manifest.sale.maximumContributionPerWallet),
       startsAt: BigInt(Math.floor(Date.parse(manifest.sale.startsAt) / 1_000)), endsAt: BigInt(Math.floor(Date.parse(manifest.sale.endsAt) / 1_000)), claimDeadline: BigInt(Math.floor(Date.parse(execution.claimDeadline) / 1_000)),
       saleFeeBps: manifest.fees.saleFeeBps, creator: "0x0000000000000000000000000000000000000000" as Address,
-      securityCouncil: getAddress(execution.securityCouncil), proceedsRecipient: getAddress(execution.proceedsRecipient), operationsRecipient: getAddress(execution.operationsRecipient),
+      securityCouncil: getAddress(execution.securityCouncil), proceedsRecipient: getAddress(execution.proceedsRecipient), liquidityRecipient: getAddress(execution.liquidityRecipient), operationsRecipient: getAddress(execution.operationsRecipient),
       rewardsRecipient: network.rewardVaultAddress, referralRegistry: getAddress(execution.referralRegistry), unsoldRecipient: getAddress(execution.unsoldRecipient),
+      eligibilitySigner: getAddress(execution.eligibilitySigner), liquidityShareBps: manifest.sale.liquidityQuoteShareBps, burnUnsold: true,
     };
     if (saleConfig.claimDeadline <= saleConfig.endsAt) return Response.json({ error: "Claim deadline must follow the sale window" }, { status: 422 });
     const otherAllocations = [
-      { recipient: getAddress(execution.liquidityRecipient), amount: exactAllocation(supply, manifest.sale.liquidityAllocationBps) },
       { recipient: getAddress(execution.creatorVestingRecipient), amount: exactAllocation(supply, manifest.sale.creatorAllocationBps) },
       { recipient: getAddress(execution.rewardsAllocationRecipient), amount: exactAllocation(supply, manifest.sale.rewardsAllocationBps) },
       { recipient: getAddress(execution.treasuryRecipient), amount: exactAllocation(supply, manifest.sale.treasuryAllocationBps) },

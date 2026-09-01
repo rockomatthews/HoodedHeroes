@@ -6,15 +6,6 @@ export const BRAND = {
   chainId: 4663,
 } as const;
 
-export type HeroTier = "Recruit" | "Specialist" | "Vanguard" | "Icon";
-
-export const HERO_TIERS = [
-  { name: "Recruit", supply: 2200, price: 100_000, energy: 10, slots: 2, color: "red" },
-  { name: "Specialist", supply: 600, price: 250_000, energy: 12, slots: 3, color: "blue" },
-  { name: "Vanguard", supply: 180, price: 500_000, energy: 14, slots: 4, color: "green" },
-  { name: "Icon", supply: 20, price: 1_000_000, energy: 16, slots: 5, color: "yellow" },
-] as const;
-
 export const RANKS = [
   { name: "Initiate", reputation: 0, days: 0, reinvest: 0, seats: null, weight: 1 },
   { name: "Operative", reputation: 100, days: 3, reinvest: 5, seats: null, weight: 1.3 },
@@ -50,3 +41,5 @@ export * from "./launch-manifest";
 export * from "./sandbox";
 export * from "./distribution";
 export * from "./code-bazaar";
+export * from "./hero-genesis";
+export * from "./hero-tiers";

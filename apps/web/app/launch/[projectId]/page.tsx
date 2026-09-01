@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getPublicLaunch } from "@/lib/server/public-launch";
 
@@ -13,8 +14,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${launch.metadata.name} (${launch.metadata.symbol}) — HOODED Launch Bay`,
     description: launch.metadata.publication.summary,
     alternates: { canonical: launch.metadata.canonicalLaunchUrl },
-    openGraph: { title: `${launch.metadata.name} // ${launch.metadata.symbol}`, description: launch.metadata.publication.summary, type: "website", images: [{ url: "/og.png", width: 1200, height: 630, alt: `${launch.metadata.name} HOODED launch` }] },
-    twitter: { card: "summary_large_image", title: `${launch.metadata.name} // ${launch.metadata.symbol}`, description: launch.metadata.publication.summary, images: ["/og.png"] },
+    openGraph: { title: `${launch.metadata.name} // ${launch.metadata.symbol}`, description: launch.metadata.publication.summary, type: "website", images: [{ url: "/launch-assets/hooded/og-1200x630.png", width: 1200, height: 630, alt: `${launch.metadata.name} HOODED launch` }] },
+    twitter: { card: "summary_large_image", title: `${launch.metadata.name} // ${launch.metadata.symbol}`, description: launch.metadata.publication.summary, images: ["/launch-assets/hooded/og-1200x630.png"] },
   };
 }
 
@@ -27,8 +28,10 @@ export default async function PublicLaunchPage({ params }: Props) {
     ["Game + seasonal rewards", launch.sale.rewardsAllocationBps],
     ["Permanently locked liquidity", launch.sale.liquidityAllocationBps],
     ["Timelocked DAO", launch.sale.treasuryAllocationBps],
-    ["Vested contributors", launch.sale.creatorAllocationBps],
+    ["Community grants", launch.sale.creatorAllocationBps],
   ] as const;
+  const tokenSupply = BigInt(launch.metadata.exactSupply) / 10n ** BigInt(launch.metadata.decimals);
+  const isLab = launch.launchClass === "lab";
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -44,14 +47,14 @@ export default async function PublicLaunchPage({ params }: Props) {
       <section className="public-launch-card">
         <header className="public-launch-header"><Link href="/" aria-label="Return to HOODED">← HQ</Link><span>LAUNCH BAY // PUBLIC VESTIBULE</span><b>{launch.environment.toUpperCase()}</b></header>
         <div className="public-launch-hero">
-          <div className="public-token-emblem"><i>H</i></div>
-          <div><small>ROBINHOOD CHAIN // FIXED SUPPLY</small><h1>{projectId === "hooded-genesis" ? "HOODED" : launch.metadata.name}</h1><h2>${launch.metadata.symbol}</h2><p>{launch.metadata.publication.summary}</p></div>
-          <aside><span>STATUS</span><strong>GENESIS PACKAGE</strong><small>SALE CLOSED // AUDIT REQUIRED</small></aside>
+          <div className="public-token-emblem"><Image src="/launch-assets/hooded/icon-512.png" alt="HOODED token emblem" width={512} height={512} /></div>
+          <div><small>ROBINHOOD CHAIN // {isLab ? "EXPERIMENTAL LAB" : "FIXED SUPPLY"}</small><h1>{projectId === "hooded-genesis" ? "HOODED" : launch.metadata.name}</h1><h2>${launch.metadata.symbol}</h2><p>{launch.metadata.publication.summary}</p></div>
+          <aside><span>STATUS</span><strong>{isLab ? "NO VALUE LAB" : "GENESIS PACKAGE"}</strong><small>{launch.lifecycle.toUpperCase().replaceAll("-", " ")}</small></aside>
         </div>
         <div className="public-launch-grid">
-          <section><h3>ONE BILLION. NO MORE.</h3><div className="supply-number">1,000,000,000</div><p>No future mint, freeze, blacklist, transfer tax, or arbitrary upgrade authority.</p><div className="authority-stamps"><b>FIXED</b><b>AGPL</b><b>PRO-RATA</b><b>LOCKED LP</b></div></section>
+          <section><h3>{isLab ? "ONE MILLION LAB UNITS" : "ONE BILLION. NO MORE."}</h3><div className="supply-number">{tokenSupply.toLocaleString("en-US")}</div><p>No future mint, freeze, blacklist, transfer tax, or arbitrary upgrade authority.</p><div className="authority-stamps"><b>FIXED</b><b>AGPL</b><b>PRO-RATA</b><b>{isLab ? "NO PUBLIC LP" : "LOCKED LP"}</b></div></section>
           <section><h3>GENESIS DISTRIBUTION</h3>{allocations.map(([label, bps]) => <div className="allocation-row" key={label}><span>{label}</span><i><b style={{ width: `${bps / 100}%` }} /></i><strong>{bps / 100}%</strong></div>)}</section>
-          <section><h3>THE ACCESS SEQUENCE</h3><ol><li><b>01</b><span>Audits, legal controls, local tests, and mainnet-fork exercises</span></li><li><b>02</b><span>Owner-only sealed mainnet canary</span></li><li><b>03</b><span>Separate public activation after verified readback</span></li><li><b>04</b><span>25,000 HOODED unlocks society preview</span></li></ol></section>
+          <section><h3>{isLab ? "LAB EVIDENCE SEQUENCE" : "THE ACCESS SEQUENCE"}</h3><ol>{isLab ? <><li><b>01</b><span>Owner-only sealed deployment</span></li><li><b>02</b><span>Source and metadata verification</span></li><li><b>03</b><span>No public liquidity or promotion</span></li><li><b>04</b><span>Permanent retirement evidence</span></li></> : <><li><b>01</b><span>Audits, legal controls, local tests, and mainnet-fork exercises</span></li><li><b>02</b><span>Safe-approved sealed mainnet creation</span></li><li><b>03</b><span>72-hour pro-rata activation after verified readback</span></li><li><b>04</b><span>25,000 HOODED unlocks society preview</span></li></>}</ol></section>
         </div>
         <footer className="public-launch-footer"><p>{launch.metadata.publication.riskDisclosure}</p><button disabled>CONTRIBUTIONS NOT OPEN</button></footer>
       </section>

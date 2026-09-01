@@ -19,7 +19,13 @@ contract TokenVestingVault is ReentrancyGuard {
 
     event TokensReleased(address indexed beneficiary, uint256 amount, uint256 totalReleased);
 
-    constructor(address tokenAddress, address beneficiaryAddress, uint64 start, uint64 vestingDuration, uint256 allocation) {
+    constructor(
+        address tokenAddress,
+        address beneficiaryAddress,
+        uint64 start,
+        uint64 vestingDuration,
+        uint256 allocation
+    ) {
         require(tokenAddress != address(0) && beneficiaryAddress != address(0), "zero address");
         require(vestingDuration > 0 && allocation > 0, "invalid vesting");
         token = IERC20(tokenAddress);

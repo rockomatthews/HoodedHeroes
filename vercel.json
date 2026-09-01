@@ -2,5 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter @hooded/web build"
+  "buildCommand": "pnpm --filter @hooded/web build",
+  "crons": [
+    { "path": "/api/cron/index-robinhood", "schedule": "* * * * *" },
+    { "path": "/api/cron/reconcile-github", "schedule": "0 * * * *" }
+  ]
 }

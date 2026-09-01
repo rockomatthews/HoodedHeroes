@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { runSandboxPreset } from "@/lib/server/sandbox-control";
 import { getSocietySession } from "@/lib/server/session";
-import { assertSameOrigin, publicError, requireIdempotencyKey } from "@/lib/server/request-security";
+import { assertSameOrigin, publicError, requireDatabaseRateLimit, requireIdempotencyKey } from "@/lib/server/request-security";
 import { db } from "@/lib/server/database";
 
 export const runtime = "nodejs";
@@ -14,6 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const key = requireIdempotencyKey(request);
     const society = await getSocietySession();
     if (!society || society.access !== "hero") return Response.json({ error: "A Genesis-Hero-gated session is required" }, { status: 403 });
+    await requireDatabaseRateLimit("sandbox-run", society.wallet, 40, 3_600);
     const { id } = await params;
     const body = bodySchema.parse(await request.json());
     const sql = db();

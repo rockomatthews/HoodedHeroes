@@ -50,10 +50,14 @@ contract LaunchFactoryForkTest {
             creator: address(0),
             securityCouncil: address(0xCAFE),
             proceedsRecipient: address(0xA11CE),
+            liquidityRecipient: address(0),
             operationsRecipient: address(0xA12),
             rewardsRecipient: address(0xA13),
             referralRegistry: address(0),
-            unsoldRecipient: address(0xA14)
+            unsoldRecipient: address(0xA14),
+            eligibilitySigner: address(0),
+            liquidityShareBps: 0,
+            burnUnsold: false
         });
         bytes32 manifestHash = keccak256("mainnet-fork-canary");
         LaunchFactory.TokenConfig memory tokenConfig =

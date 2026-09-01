@@ -43,10 +43,14 @@ contract LaunchFactoryTest {
             creator: address(0),
             securityCouncil: address(0x3333),
             proceedsRecipient: address(0x4444),
+            liquidityRecipient: address(0),
             operationsRecipient: address(0x5555),
             rewardsRecipient: rewards,
             referralRegistry: address(0),
-            unsoldRecipient: treasury
+            unsoldRecipient: treasury,
+            eligibilitySigner: address(0),
+            liquidityShareBps: 0,
+            burnUnsold: false
         });
         LaunchFactory.TokenConfig memory tokenConfig =
             LaunchFactory.TokenConfig("Launch", "LCH", 1_000 ether, keccak256("manifest"));
@@ -86,10 +90,14 @@ contract LaunchFactoryTest {
             creator: address(0),
             securityCouncil: address(0x3333),
             proceedsRecipient: address(0x4444),
+            liquidityRecipient: address(0),
             operationsRecipient: address(0x5555),
             rewardsRecipient: address(0x6666),
             referralRegistry: address(0),
-            unsoldRecipient: address(0x7777)
+            unsoldRecipient: address(0x7777),
+            eligibilitySigner: address(0),
+            liquidityShareBps: 0,
+            burnUnsold: false
         });
         LaunchFactory.TokenConfig memory tokenConfig =
             LaunchFactory.TokenConfig("Canary", "CNY", 1_000 ether, keccak256("canary-manifest"));

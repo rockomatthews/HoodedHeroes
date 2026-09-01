@@ -18,14 +18,10 @@ export const DEFAULT_SANDBOX_LIMITS: SandboxLimits = {
   exposedPorts: 1,
 };
 
-export const APPROVED_SANDBOX_REPOSITORIES = [
-  "rockomatthews/HOODED",
-] as const;
-
 export type SandboxSession = {
   id: string;
   owner: `0x${string}`;
-  repository: (typeof APPROVED_SANDBOX_REPOSITORIES)[number];
+  repository: string;
   baseCommit: string;
   runtime: SandboxRuntime;
   limits: SandboxLimits;

@@ -14,5 +14,6 @@ out
 cache
 broadcast
 artifacts
+art/generated
 apps/web/AGENTS.md
 apps/web/CLAUDE.md

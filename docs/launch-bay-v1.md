@@ -1,15 +1,17 @@
 # Launch Bay v1 implementation
 
-Launch Bay v1 is a fixed-price, timed, pro-rata fair-launch mainnet-canary candidate. The canonical `LaunchManifestV1` drives UI validation, simulation, public metadata, APIs, and contract configuration for Robinhood Chain, Base, and the staged Solana adapter. HOODED does not use public testnets: evidence comes from local tests, mainnet forks, unsigned simulations, and a sealed owner-only canary.
+Launch Bay v1.1 is a fixed-price, timed, pro-rata fair-launch candidate for Robinhood Chain. `LaunchManifestV1.1` drives UI validation, simulation, metadata, APIs, and contract configuration. HOODED does not use public testnets: evidence comes from local tests, mainnet forks, unsigned simulations, two owner-only lab launches, and independent review.
 
 ## Implemented foundations
 
-- Thirteen deterministic manifest gates, including a bound canary creator, fixed supply, exact allocation conservation, approved chain quote assets, 1% fee cap, a published nonzero Hero reward-vault recipient, immutable authority flags, permanent liquidity, metadata completeness, reproducible source hashes, and sealed owner-only execution.
+- Fourteen deterministic manifest gates, including launch classification, a bound creator, fixed supply, exact allocation conservation, approved quote assets, 1% fee cap, a published Hero reward vault, immutable authority flags, production liquidity or lab no-pool enforcement, EIP-712 contribution eligibility, metadata completeness, reproducible source hashes, and sealed execution.
 - Shared pro-rata allocation simulator with integer rounding equivalent to the EVM contract.
 - Metaplex, Uniswap Token List, and DEX Screener payload generation from one versioned metadata record.
 - Public launch list/detail/validation/simulation endpoints.
 - Signed-wallet owner-gated canary persistence and a fail-closed transaction-preparation endpoint.
-- `FixedSupplyLaunchToken`, `LaunchFactory`, `ProRataFairLaunch`, and `ImmutableReferralRegistry` contracts.
+- Burnable `FixedSupplyLaunchToken`, owner-only `LaunchFactory`, Safe-approved `ProductionLaunchFactory`, `ProRataFairLaunch`, `RobinhoodLiquidityCoordinator`, ownerless position receiver, and immutable referral registry.
+- Production approvals and participant eligibility are EIP-712 signatures bound to chain, contract, wallet, manifest, nonce, allowance, and expiration. Claims and refunds never require eligibility approval.
+- Accepted quote is split during settlement. For HOODED, 37.5% enters the liquidity coordinator, the disclosed fee follows its immutable split, and the remainder accrues to the DAO timelock.
 - Permissionless failed-launch refunds, oversubscription refunds, incident-pause-to-refund behavior, settlement on behalf of inactive contributors, immutable recipients, and no owner withdrawal. Quote proceeds, fees, and refunds use recipient-owned pull balances, so a recipient that rejects ETH cannot block anyone else's settlement. Unsold tokens cannot move until every contribution has settled.
 - Owner-only unsigned creation and activation preparation routes with exact factory/sale bytecode checks, immutable-owner readback, manifest-hash checks, gas estimation, and required mainnet `eth_call` simulation.
 - Launch preparation requires the manifest reward recipient, submitted execution recipient, and server-configured chain reward vault to match exactly. The reward vault can permissionlessly pull its accrued sale-fee balance into a new equal-per-Hero round; native fees are wrapped before accounting.
@@ -17,11 +19,13 @@ Launch Bay v1 is a fixed-price, timed, pro-rata fair-launch mainnet-canary candi
 
 ## Deliberately disabled
 
-No deployment address is bundled. The prepare endpoint refuses to create an unsigned transaction until the configured mainnet factory bytecode, immutable canary owner, chain-specific Hero reward-vault address and runtime bytecode hash, manifest lifecycle, and full call simulation all match. It never broadcasts. The public reward ledger displays `CANARY NOT CONFIGURED` rather than placeholder balances until a reviewed vault address and code hash exist. Solana activation, Stock Token pairs, public sale activation, listing submissions, and paid promotion remain closed approval gates.
+No deployment address is bundled. Lab and production prepare endpoints refuse to create unsigned transactions until their factories, reward vault, approval signer, liquidity adapter, position manager, manifests, and runtime hashes match. They never broadcast. Solana activation, Base production, Stock Token pairs, public sale activation, listing submissions, and paid promotion remain closed approval gates.
 
 ## HOODED genesis preset
 
-The bundled mainnet-canary manifest fixes supply at 1,000,000,000 HOODED and encodes 40% fair launch, 30% game/season rewards, 15% locked liquidity, 10% timelocked DAO, and 5% contributors vesting for 24 months. Its placeholder wallet, content hashes, dates, and media URI must be replaced and independently reviewed before any owner signature.
+The bundled production manifest fixes supply at 1,000,000,000 HOODED and encodes 40% fair launch, 30% game/season rewards, a maximum 15% liquidity allocation, 10% timelocked DAO, and 5% community grants vesting for at least 24 months. Price is 0.000000025 ETH per HOODED, the raise is 0.25–10 ETH, the wallet cap is 0.1 ETH, and the window lasts 72 hours. Partial raises scale liquidity at the same price and burn unused liquidity and sale supply.
+
+Genesis Heroes reserve Recruit IDs 1–10 as a free, immediately transferable founder grant inside the 3,000 cap. Public inventory is 2,190 Recruits, 600 Specialists, 180 Vanguards, and 20 Icons. The founder wallet cannot also use the public primary mint.
 
 ## Mainnet canary sequence
 

@@ -6,7 +6,11 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      '@vercel/sandbox':
+        specifier: 1.10.2
+        version: 1.10.2
 
   apps/score-service:
     dependencies:

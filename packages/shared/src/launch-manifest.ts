@@ -1,5 +1,6 @@
 export type LaunchChain = "robinhood" | "base" | "solana";
-export type LaunchEnvironment = "mainnet-canary";
+export type LaunchEnvironment = "mainnet-canary" | "mainnet";
+export type LaunchClass = "lab" | "production";
 export type LaunchQuoteAsset = "ETH" | "SOL" | "USDC" | "USDG" | "HOODED";
 export type LaunchLifecycle =
   | "draft"
@@ -14,7 +15,7 @@ export type LaunchLifecycle =
   | "public-eligible";
 
 export type LaunchMetadataV1 = {
-  schemaVersion: "1.0.0";
+  schemaVersion: "1.1.0";
   projectId: string;
   chain: LaunchChain;
   tokenAddress?: string;
@@ -25,6 +26,8 @@ export type LaunchMetadataV1 = {
   creatorWallet: string;
   sourceCommit: string;
   buildHash: string;
+  immutableCoreHash: string;
+  factoryVersion: "1.1.0";
   license: "AGPL-3.0-or-later";
   canonicalLaunchUrl: string;
   explorerUrl?: string;
@@ -58,6 +61,7 @@ export type LaunchMetadataV1 = {
     previousContentHash?: string;
     contentHash: string;
     authorWallet: string;
+    signature: string;
     timestamp: string;
     changeReason: string;
     frozen: boolean;
@@ -65,8 +69,9 @@ export type LaunchMetadataV1 = {
 };
 
 export type LaunchManifestV1 = {
-  manifestVersion: "1.0.0";
+  manifestVersion: "1.1.0";
   environment: LaunchEnvironment;
+  launchClass: LaunchClass;
   lifecycle: LaunchLifecycle;
   metadata: LaunchMetadataV1;
   sale: {
@@ -83,6 +88,7 @@ export type LaunchManifestV1 = {
     startsAt: string;
     endsAt: string;
     quoteAsset: LaunchQuoteAsset;
+    liquidityQuoteShareBps: number;
   };
   vesting: {
     creatorMonths: number;
@@ -96,11 +102,16 @@ export type LaunchManifestV1 = {
     rewardsRecipient: string;
   };
   liquidity: {
-    venue: "uniswap-v4" | "raydium-cpmm";
+    venue: "none" | "uniswap-v4" | "raydium-cpmm";
     permanentlyLocked: true;
   };
+  eligibility: {
+    required: boolean;
+    permitStandard: "eip712-launch-v1" | "none";
+    claimsAndRefundsPermissionless: true;
+  };
   canary: {
-    creatorAccess: "single-wallet";
+    creatorAccess: "single-wallet" | "approved-creator";
     sealedAtCreation: true;
     separatePublicActivation: true;
     mainnetForkRequired: true;
@@ -118,8 +129,24 @@ export function canonicalJson(value: unknown): string {
 }
 
 export function metadataRevisionPayload(metadata: LaunchMetadataV1) {
-  const { contentHash: _contentHash, ...revision } = metadata.revision;
+  const { contentHash: _contentHash, signature: _signature, ...revision } = metadata.revision;
   return { ...metadata, revision };
+}
+
+export function launchMetadataImmutableCore(metadata: LaunchMetadataV1) {
+  const { publication: _publication, revision: _revision, immutableCoreHash: _immutableCoreHash, ...core } = metadata;
+  return core;
+}
+
+export function metadataRevisionAttestation(metadata: LaunchMetadataV1) {
+  return [
+    "HOODED LAUNCH METADATA REVISION",
+    `Project: ${metadata.projectId}`,
+    `Version: ${metadata.revision.version}`,
+    `Content: ${metadata.revision.contentHash.toLowerCase()}`,
+    `Previous: ${metadata.revision.previousContentHash?.toLowerCase() ?? "GENESIS"}`,
+    `Reason: ${metadata.revision.changeReason}`,
+  ].join("\n");
 }
 
 const CHAIN_QUOTES: Record<LaunchChain, readonly LaunchQuoteAsset[]> = {
@@ -150,8 +177,11 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
     && !/^0+$/i.test(metadata.sourceCommit)
     && /^[a-f0-9]{64}$/i.test(metadata.buildHash)
     && !/^0+$/i.test(metadata.buildHash)
+    && /^[a-f0-9]{64}$/i.test(metadata.immutableCoreHash)
+    && !/^0+$/i.test(metadata.immutableCoreHash)
     && /^[a-f0-9]{64}$/i.test(metadata.revision.contentHash)
-    && !/^0+$/i.test(metadata.revision.contentHash);
+    && !/^0+$/i.test(metadata.revision.contentHash)
+    && /^0x[a-f0-9]{130}$/i.test(metadata.revision.signature);
   const monetaryValues = [sale.pricePerToken, sale.minimumRaise, sale.maximumRaise, sale.maximumContributionPerWallet];
   const fixedPriceMatches = metadata.chain === "solana" || (
     isIntegerString(metadata.exactSupply)
@@ -169,21 +199,23 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
     { id: "raise", label: "Fixed price and wallet limits", passed: monetaryValues.every(isIntegerString) && BigInt(sale.minimumRaise) > 0n && BigInt(sale.maximumRaise) >= BigInt(sale.minimumRaise) && BigInt(sale.maximumContributionPerWallet) > 0n && fixedPriceMatches, detail: "All monetary values use integer base units; EVM price × sale allocation must exactly equal the maximum raise." },
     { id: "quote", label: "Approved quote asset", passed: CHAIN_QUOTES[metadata.chain].includes(sale.quoteAsset), detail: "Quote asset must be approved for the selected chain." },
     { id: "fees", label: "Transparent capped fee", passed: fees.saleFeeBps >= 0 && fees.saleFeeBps <= 100 && fees.operationsShareBps + fees.rewardsShareBps + fees.referralShareBps === 10_000 && /^0x[a-fA-F0-9]{40}$/.test(fees.rewardsRecipient) && !/^0x0{40}$/i.test(fees.rewardsRecipient), detail: "Sale fee cannot exceed 1%, recipient shares must equal 100%, and the immutable Hero reward vault must be published." },
-    { id: "liquidity", label: "Permanent liquidity", passed: manifest.liquidity.permanentlyLocked && (metadata.chain === "solana" ? manifest.liquidity.venue === "raydium-cpmm" : manifest.liquidity.venue === "uniswap-v4"), detail: "Liquidity must be permanently locked at the approved chain venue." },
+    { id: "liquidity", label: "Permanent liquidity", passed: manifest.launchClass === "lab" ? manifest.liquidity.venue === "none" : manifest.liquidity.permanentlyLocked && sale.liquidityQuoteShareBps === 3_750 && (metadata.chain === "solana" ? manifest.liquidity.venue === "raydium-cpmm" : manifest.liquidity.venue === "uniswap-v4"), detail: "Production liquidity uses 37.5% of accepted quote and must be permanently locked at the approved chain venue; lab launches create no public pool." },
+    { id: "eligibility", label: "Contribution eligibility", passed: manifest.eligibility.claimsAndRefundsPermissionless && (manifest.eligibility.required ? manifest.eligibility.permitStandard === "eip712-launch-v1" : manifest.eligibility.permitStandard === "none"), detail: "Contribution permits may gate new funds, but claims and refunds must remain permissionless." },
     { id: "metadata", label: "Distribution metadata", passed: metadata.publication.summary.trim().length >= 20 && metadata.publication.description.trim().length >= 50 && metadata.publication.riskDisclosure.trim().length >= 20 && publicationUrls.every(isHttpUrl) && !hasPlaceholderMetadata, detail: "Complete descriptive, risk, and valid non-placeholder distribution URLs are required." },
     { id: "build", label: "Reproducible source", passed: hasReproducibleBuild, detail: "Non-placeholder source commit, build hash, and metadata content hash must be published." },
-    { id: "canary", label: "Owner-only sealed canary", passed: manifest.environment === "mainnet-canary" && manifest.canary.creatorAccess === "single-wallet" && manifest.canary.sealedAtCreation && manifest.canary.separatePublicActivation && manifest.canary.mainnetForkRequired && manifest.canary.transactionSimulationRequired, detail: "Mainnet creation stays single-wallet, sealed, fork-tested, simulated, and separate from public activation." },
+    { id: "canary", label: "Sealed mainnet release", passed: (manifest.launchClass === "lab" ? manifest.environment === "mainnet-canary" && manifest.canary.creatorAccess === "single-wallet" : manifest.environment === "mainnet" && manifest.canary.creatorAccess === "approved-creator") && manifest.canary.sealedAtCreation && manifest.canary.separatePublicActivation && manifest.canary.mainnetForkRequired && manifest.canary.transactionSimulationRequired, detail: "Creation stays reviewed, sealed, fork-tested, simulated, and separate from public activation." },
   ];
 
   return { checks, ready: checks.every((check) => check.passed), passed: checks.filter((check) => check.passed).length, total: checks.length };
 }
 
 export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
-  manifestVersion: "1.0.0",
-  environment: "mainnet-canary",
+  manifestVersion: "1.1.0",
+  environment: "mainnet",
+  launchClass: "production",
   lifecycle: "draft",
   metadata: {
-    schemaVersion: "1.0.0",
+    schemaVersion: "1.1.0",
     projectId: "hooded-genesis",
     chain: "robinhood",
     name: "HOODED",
@@ -193,6 +225,8 @@ export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
     creatorWallet: "0x0000000000000000000000000000000000000000",
     sourceCommit: "0000000",
     buildHash: "0".repeat(64),
+    immutableCoreHash: "0".repeat(64),
+    factoryVersion: "1.1.0",
     license: "AGPL-3.0-or-later",
     canonicalLaunchUrl: "https://hooded.world/launch/hooded-genesis",
     authorities: { futureMint: false, freeze: false, blacklist: false, mutableTax: false, arbitraryUpgrade: false },
@@ -205,9 +239,10 @@ export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
       riskDisclosure: "Digital assets are risky and may lose all value. No return, liquidity, or listing is promised.",
       jurisdictionNotice: "Availability depends on applicable law, sanctions screening, and jurisdiction controls.",
       teamDisclosure: "pseudonymous",
-      image: "ipfs://pending-hero-icon",
+      image: "https://hooded.world/brand/hooded-coin-emblem.png",
+      header: "https://hooded.world/launch-assets/hooded/og-1200x630.png",
     },
-    revision: { version: 1, contentHash: "0".repeat(64), authorWallet: "0x0000000000000000000000000000000000000000", timestamp: "2026-08-30T00:00:00.000Z", changeReason: "Initial owner-only mainnet canary manifest", frozen: false },
+    revision: { version: 1, contentHash: "0".repeat(64), authorWallet: "0x0000000000000000000000000000000000000000", signature: "0x", timestamp: "2026-08-30T00:00:00.000Z", changeReason: "Initial reviewed production manifest", frozen: false },
   },
   sale: {
     mode: "fixed-price-pro-rata",
@@ -216,19 +251,67 @@ export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
     creatorAllocationBps: 500,
     rewardsAllocationBps: 3_000,
     treasuryAllocationBps: 1_000,
-    pricePerToken: "1000000000000000000",
-    minimumRaise: "1",
-    maximumRaise: "400000000000000000000000000",
-    maximumContributionPerWallet: "10000000000000000000000000",
+    pricePerToken: "25000000000",
+    minimumRaise: "250000000000000000",
+    maximumRaise: "10000000000000000000",
+    maximumContributionPerWallet: "100000000000000000",
     startsAt: "2026-10-01T16:00:00.000Z",
     endsAt: "2026-10-03T16:00:00.000Z",
     quoteAsset: "ETH",
+    liquidityQuoteShareBps: 3_750,
   },
   vesting: { creatorMonths: 24, contributorMonths: 24 },
   fees: { saleFeeBps: 75, operationsShareBps: 5_000, rewardsShareBps: 3_000, referralShareBps: 2_000, rewardsRecipient: "0x0000000000000000000000000000000000000000" },
   liquidity: { venue: "uniswap-v4", permanentlyLocked: true },
-  canary: { creatorAccess: "single-wallet", sealedAtCreation: true, separatePublicActivation: true, mainnetForkRequired: true, transactionSimulationRequired: true },
+  eligibility: { required: true, permitStandard: "eip712-launch-v1", claimsAndRefundsPermissionless: true },
+  canary: { creatorAccess: "approved-creator", sealedAtCreation: true, separatePublicActivation: true, mainnetForkRequired: true, transactionSimulationRequired: true },
 };
+
+function labManifest(projectId: "hlab1" | "hlab2", live: boolean): LaunchManifestV1 {
+  const symbol = projectId.toUpperCase();
+  return {
+    ...structuredClone(HOODED_GENESIS_MANIFEST),
+    environment: "mainnet-canary",
+    launchClass: "lab",
+    lifecycle: "draft",
+    metadata: {
+      ...structuredClone(HOODED_GENESIS_MANIFEST.metadata),
+      projectId,
+      name: `HOODED LAB ${projectId === "hlab1" ? "01" : "02"}`,
+      symbol,
+      exactSupply: "1000000000000000000000000",
+      canonicalLaunchUrl: `https://hooded.world/launch/${projectId}`,
+      publication: {
+        ...structuredClone(HOODED_GENESIS_MANIFEST.metadata.publication),
+        summary: `${symbol} is an owner-only HOODED metadata rehearsal with no promised value.`,
+        description: `${symbol} exists solely to verify source, wallet display, metadata, settlement, and retirement evidence before the production HOODED launch.`,
+        utility: "Experimental metadata and contract-flow rehearsal only. No value or liquidity is promised.",
+        riskDisclosure: "EXPERIMENTAL // NO VALUE. This lab token has no public liquidity, financial promise, or production utility.",
+      },
+      revision: { ...structuredClone(HOODED_GENESIS_MANIFEST.metadata.revision), changeReason: "Initial owner-only lab manifest" },
+    },
+    sale: {
+      ...structuredClone(HOODED_GENESIS_MANIFEST.sale),
+      saleAllocationBps: 10_000,
+      liquidityAllocationBps: 0,
+      creatorAllocationBps: 0,
+      rewardsAllocationBps: 0,
+      treasuryAllocationBps: 0,
+      pricePerToken: live ? "10000000000" : "1000000000",
+      minimumRaise: live ? "1000000000000000" : "100000000000000",
+      maximumRaise: live ? "10000000000000000" : "1000000000000000",
+      maximumContributionPerWallet: live ? "10000000000000000" : "1000000000000000",
+      liquidityQuoteShareBps: 0,
+    },
+    vesting: { creatorMonths: 0, contributorMonths: 0 },
+    liquidity: { venue: "none", permanentlyLocked: true },
+    eligibility: { required: true, permitStandard: "eip712-launch-v1", claimsAndRefundsPermissionless: true },
+    canary: { creatorAccess: "single-wallet", sealedAtCreation: true, separatePublicActivation: true, mainnetForkRequired: true, transactionSimulationRequired: true },
+  };
+}
+
+export const HLAB1_MANIFEST = labManifest("hlab1", false);
+export const HLAB2_MANIFEST = labManifest("hlab2", true);
 
 export type ContributionSimulation = {
   wallet: string;

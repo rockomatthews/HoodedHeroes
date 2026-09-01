@@ -13,9 +13,9 @@ import {
 } from "@hooded/shared";
 
 const CHAINS: { id: LaunchChain; label: string; status: string; color: string }[] = [
-  { id: "robinhood", label: "RH CHAIN", status: "HOODED FIRST", color: "green" },
-  { id: "base", label: "BASE", status: "COMMUNITY DRAFT", color: "blue" },
-  { id: "solana", label: "SOLANA", status: "LOCAL SIM ONLY", color: "purple" },
+  { id: "robinhood", label: "RH CHAIN", status: "V1 RELEASE PATH", color: "green" },
+  { id: "base", label: "BASE", status: "UNAVAILABLE // AUDIT REQUIRED", color: "blue" },
+  { id: "solana", label: "SOLANA", status: "UNAVAILABLE // NOT IMPLEMENTED", color: "purple" },
 ];
 
 function cloneGenesis() {
@@ -86,7 +86,7 @@ export function LaunchBayWorkbench() {
     <div className="launch-builder launch-builder--v1">
       <div className="chain-selector">
         {CHAINS.map((chain) => (
-          <button key={chain.id} className={`${manifest.metadata.chain === chain.id ? "is-active" : ""} chain-${chain.color}`} onClick={() => selectChain(chain.id)}>
+          <button key={chain.id} disabled={chain.id !== "robinhood"} className={`${manifest.metadata.chain === chain.id ? "is-active" : ""} chain-${chain.color}`} onClick={() => selectChain(chain.id)}>
             <b>{chain.label}</b><small>{chain.status}</small>
           </button>
         ))}
@@ -102,13 +102,13 @@ export function LaunchBayWorkbench() {
           <div className="launch-terms"><span>PRO-RATA WINDOW</span><span>0.75% FEE</span><span>1% HARD CAP</span><span>NO ADMIN WITHDRAW</span></div>
         </div>
         <div className="launch-audit launch-audit--tabs">
-          <div className="launch-view-tabs"><button className={view === "audit" ? "is-active" : ""} onClick={() => setView("audit")}>13 GATES</button><button className={view === "metadata" ? "is-active" : ""} onClick={() => setView("metadata")}>METADATA</button><button className={view === "simulation" ? "is-active" : ""} onClick={() => setView("simulation")}>SIM</button></div>
-          {view === "audit" && <><div className="launch-score"><span>MANIFEST READINESS</span><strong>{validation.passed}/{validation.total}</strong><b className={validation.ready ? "is-ready" : "is-blocked"}>{validation.ready ? "CANARY REVIEW READY" : "REAL EVIDENCE REQUIRED"}</b></div><div className="launch-checks launch-checks--dense">{validation.checks.map((check) => <div key={check.id} className={check.passed ? "is-pass" : "is-fail"} title={check.detail}><i>{check.passed ? "✓" : "×"}</i><span>{check.label}</span></div>)}</div></>}
+          <div className="launch-view-tabs"><button className={view === "audit" ? "is-active" : ""} onClick={() => setView("audit")}>14 GATES</button><button className={view === "metadata" ? "is-active" : ""} onClick={() => setView("metadata")}>METADATA</button><button className={view === "simulation" ? "is-active" : ""} onClick={() => setView("simulation")}>SIM</button></div>
+          {view === "audit" && <><div className="launch-score"><span>MANIFEST READINESS</span><strong>{validation.passed}/{validation.total}</strong><b className={validation.ready ? "is-ready" : "is-blocked"}>{validation.ready ? "REVIEW PACKAGE READY" : "REAL EVIDENCE REQUIRED"}</b></div><div className="launch-checks launch-checks--dense">{validation.checks.map((check) => <div key={check.id} className={check.passed ? "is-pass" : "is-fail"} title={check.detail}><i>{check.passed ? "✓" : "×"}</i><span>{check.label}</span></div>)}</div></>}
           {view === "metadata" && <div className="metadata-preview"><b>MAX-EXPOSURE PACKAGE</b><p>Metaplex · Uniswap List · Blockscout · DEX Screener · CoinGecko · OG 1200×630</p><pre>{JSON.stringify(distributionPreview, null, 2).slice(0, 600)}</pre>{dexPreview && <small>DEX profile ready</small>}</div>}
           {view === "simulation" && <div className="simulation-preview"><b>OVERSUBSCRIBED // SAME PRICE</b>{simulation.wallets.map((wallet) => <div key={wallet.wallet}><span>{wallet.wallet}</span><strong>{wallet.tokenAllocation.toString()} TOKEN</strong><small>{wallet.refund.toString()} REFUND</small></div>)}</div>}
         </div>
       </div>
-      <div className="launch-pipeline launch-pipeline--v1"><span>DRAFT</span><i>→</i><span>LOCAL + FORK</span><i>→</i><span>SECURITY</span><i>→</i><span>MAINNET SIM</span><i>→</i><span>OWNER CANARY</span><button disabled={!validation.ready} onClick={() => setSubmitted(true)}>{submitted ? "✓ CANARY PACKAGE SEALED" : validation.ready ? "QUEUE OWNER CANARY" : `${validation.total - validation.passed} GATES BLOCKED`}</button></div>
+      <div className="launch-pipeline launch-pipeline--v1"><span>DRAFT</span><i>→</i><span>LOCAL + FORK</span><i>→</i><span>SECURITY</span><i>→</i><span>MAINNET SIM</span><i>→</i><span>WALLET SIGN</span><button disabled={!validation.ready} onClick={() => setSubmitted(true)}>{submitted ? "✓ REVIEW PACKAGE SEALED" : validation.ready ? "QUEUE REVIEW PACKAGE" : `${validation.total - validation.passed} GATES BLOCKED`}</button></div>
     </div>
   );
 }
