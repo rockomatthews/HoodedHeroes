@@ -101,7 +101,7 @@ create table launches (
   project_id text primary key,
   creator_wallet text not null references society_members(wallet_address),
   chain text not null check (chain in ('robinhood', 'base', 'solana')),
-  environment text not null check (environment in ('testnet', 'mainnet-candidate')),
+  environment text not null check (environment = 'mainnet-canary'),
   lifecycle text not null,
   token_address text,
   manifest jsonb not null,

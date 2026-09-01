@@ -20,6 +20,6 @@
 
 ## Honest adapter status
 
-- Robinhood Chain: testnet candidate; no verified deployment bundled.
-- Base: testnet candidate; no verified deployment bundled.
+- Robinhood Chain: owner-only mainnet canary candidate; no verified deployment bundled.
+- Base: owner-only mainnet canary candidate; no verified deployment bundled.
 - Solana: planned independent program; interface preview only.

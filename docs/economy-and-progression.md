@@ -12,7 +12,7 @@
 
 Universal HOODED rewards and regulated Stock Token bonuses use separate manifests, eligibility checks, vaults, and claim screens. The Stock Token path requires identity, jurisdiction, sanctions, wallet-control, and current-eligibility verification. A prohibited claimant gets no Stock Token and no deferred substitute.
 
-The first Stock Token roster is AAPL, NVDA, AMZN, GOOGL, MSFT, and TSLA, subject to canonical Robinhood Chain assets and supported Chainlink feeds being verified before testnet integration.
+The first Stock Token roster is AAPL, NVDA, AMZN, GOOGL, MSFT, and TSLA, subject to canonical Robinhood Chain assets, supported Chainlink feeds, legal eligibility, and mainnet-fork verification before integration.
 
 ## Rank ladder
 

@@ -9,9 +9,18 @@ import {ProRataFairLaunch} from "./ProRataFairLaunch.sol";
 contract LaunchFactory {
     using SafeERC20 for FixedSupplyLaunchToken;
 
-    string public constant TEMPLATE_VERSION = "1.0.0-testnet";
+    string public constant TEMPLATE_VERSION = "1.0.0-mainnet-canary";
+    address public immutable canaryCreator;
+    mapping(bytes32 => bool) public usedManifestHash;
 
-    event LaunchCreated(address indexed creator, address indexed token, address indexed fairLaunch, bytes32 manifestHash);
+    event LaunchCreated(
+        address indexed creator, address indexed token, address indexed fairLaunch, bytes32 manifestHash, bool isSealed
+    );
+
+    constructor(address canaryCreator_) {
+        require(canaryCreator_ != address(0), "zero canary creator");
+        canaryCreator = canaryCreator_;
+    }
 
     struct TokenConfig {
         string name;
@@ -30,12 +39,19 @@ contract LaunchFactory {
         ProRataFairLaunch.Config calldata saleConfig,
         Allocation[] calldata otherAllocations
     ) external returns (address tokenAddress, address fairLaunchAddress) {
+        require(msg.sender == canaryCreator, "not canary creator");
         require(tokenConfig.manifestHash != bytes32(0), "missing manifest");
-        FixedSupplyLaunchToken token = new FixedSupplyLaunchToken(tokenConfig.name, tokenConfig.symbol, tokenConfig.supply, address(this));
+        require(!usedManifestHash[tokenConfig.manifestHash], "manifest already used");
+        usedManifestHash[tokenConfig.manifestHash] = true;
+        bytes32 tokenSalt = keccak256(abi.encode(tokenConfig.manifestHash, "TOKEN"));
+        FixedSupplyLaunchToken token = new FixedSupplyLaunchToken{salt: tokenSalt}(
+            tokenConfig.name, tokenConfig.symbol, tokenConfig.supply, address(this), tokenConfig.manifestHash
+        );
         ProRataFairLaunch.Config memory config = saleConfig;
         config.saleToken = address(token);
         config.creator = msg.sender;
-        ProRataFairLaunch fairLaunch = new ProRataFairLaunch(config);
+        bytes32 saleSalt = keccak256(abi.encode(tokenConfig.manifestHash, "SALE"));
+        ProRataFairLaunch fairLaunch = new ProRataFairLaunch{salt: saleSalt}(config);
 
         uint256 allocated = config.saleAllocation;
         token.safeTransfer(address(fairLaunch), config.saleAllocation);
@@ -45,7 +61,34 @@ contract LaunchFactory {
             token.safeTransfer(otherAllocations[i].recipient, otherAllocations[i].amount);
         }
         require(allocated == tokenConfig.supply && token.balanceOf(address(this)) == 0, "allocation mismatch");
-        emit LaunchCreated(msg.sender, address(token), address(fairLaunch), tokenConfig.manifestHash);
+        emit LaunchCreated(msg.sender, address(token), address(fairLaunch), tokenConfig.manifestHash, true);
         return (address(token), address(fairLaunch));
+    }
+
+    function predictAddresses(TokenConfig calldata tokenConfig, ProRataFairLaunch.Config calldata saleConfig)
+        external
+        view
+        returns (address tokenAddress, address fairLaunchAddress)
+    {
+        bytes32 tokenSalt = keccak256(abi.encode(tokenConfig.manifestHash, "TOKEN"));
+        bytes32 tokenBytecodeHash = keccak256(
+            abi.encodePacked(
+                type(FixedSupplyLaunchToken).creationCode,
+                abi.encode(
+                    tokenConfig.name, tokenConfig.symbol, tokenConfig.supply, address(this), tokenConfig.manifestHash
+                )
+            )
+        );
+        tokenAddress = _create2Address(tokenSalt, tokenBytecodeHash);
+        ProRataFairLaunch.Config memory config = saleConfig;
+        config.saleToken = tokenAddress;
+        config.creator = canaryCreator;
+        bytes32 saleSalt = keccak256(abi.encode(tokenConfig.manifestHash, "SALE"));
+        bytes32 saleBytecodeHash = keccak256(abi.encodePacked(type(ProRataFairLaunch).creationCode, abi.encode(config)));
+        fairLaunchAddress = _create2Address(saleSalt, saleBytecodeHash);
+    }
+
+    function _create2Address(bytes32 salt, bytes32 bytecodeHash) private view returns (address) {
+        return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, bytecodeHash)))));
     }
 }

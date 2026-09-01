@@ -3,9 +3,10 @@ import { HOODED_GENESIS_MANIFEST, validateLaunchManifest, type LaunchManifestV1 
 import { databaseConfigured, db } from "@/lib/server/database";
 import { getSocietySession } from "@/lib/server/session";
 import { assertSameOrigin, publicError, requireIdempotencyKey } from "@/lib/server/request-security";
+import { canaryModeEnabled, isLaunchCanaryOwner } from "@/lib/server/launch-canary";
 
 export async function GET() {
-  if (!databaseConfigured()) return Response.json({ launches: [HOODED_GENESIS_MANIFEST], source: "bundled-testnet-manifest" });
+  if (!databaseConfigured()) return Response.json({ launches: [HOODED_GENESIS_MANIFEST], source: "bundled-mainnet-canary-manifest" });
   const sql = db();
   const rows = await sql`select manifest from launches order by created_at desc limit 50`;
   return Response.json({ launches: rows.map((row) => (row as Record<string, unknown>).manifest), source: "postgres" }, { headers: { "Cache-Control": "public, max-age=15, stale-while-revalidate=60" } });
@@ -17,11 +18,13 @@ export async function POST(request: Request) {
     const key = requireIdempotencyKey(request);
     const session = await getSocietySession();
     if (!session || session.access !== "hero") return Response.json({ error: "A Genesis-Hero-gated session is required" }, { status: 403 });
+    if (!canaryModeEnabled() || !isLaunchCanaryOwner(session.wallet)) return Response.json({ error: "Owner-only mainnet canary creation is disabled" }, { status: 403 });
     if (!databaseConfigured()) return Response.json({ error: "PostgreSQL is not configured" }, { status: 503 });
     const manifest = await request.json() as LaunchManifestV1;
     const validation = validateLaunchManifest(manifest);
     if (!validation.ready) return Response.json({ error: "Manifest is blocked", validation }, { status: 422 });
-    if (manifest.environment !== "testnet") return Response.json({ error: "Mainnet preparation is disabled" }, { status: 403 });
+    if (manifest.environment !== "mainnet-canary") return Response.json({ error: "Only sealed mainnet canary manifests are accepted" }, { status: 403 });
+    if (manifest.metadata.creatorWallet.toLowerCase() !== session.wallet.toLowerCase()) return Response.json({ error: "Manifest creator must match the signed canary owner" }, { status: 403 });
     const hash = createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
     const sql = db();
     const existing = await sql`select manifest, manifest_hash from launches where project_id = ${manifest.metadata.projectId} limit 1`;

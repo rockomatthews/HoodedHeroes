@@ -4,19 +4,20 @@ import { useMemo, useState } from "react";
 import { HOODED_GENESIS_MANIFEST, buildDexScreenerProfile, buildMetaplexMetadata, buildUniswapTokenList, simulateProRataLaunch, validateLaunchManifest, type LaunchChain, type LaunchManifestV1 } from "@hooded/shared";
 
 const CHAINS: { id: LaunchChain; label: string; status: string; color: string }[] = [
-  { id: "robinhood", label: "RH CHAIN", status: "EVM TESTNET", color: "green" },
-  { id: "base", label: "BASE", status: "EVM TESTNET", color: "blue" },
-  { id: "solana", label: "SOLANA", status: "ADAPTER PREVIEW", color: "purple" },
+  { id: "robinhood", label: "RH CHAIN", status: "OWNER CANARY", color: "green" },
+  { id: "base", label: "BASE", status: "OWNER CANARY", color: "blue" },
+  { id: "solana", label: "SOLANA", status: "LOCAL SIM ONLY", color: "purple" },
 ];
 
 function initialManifest(): LaunchManifestV1 {
   const manifest = JSON.parse(JSON.stringify(HOODED_GENESIS_MANIFEST)) as LaunchManifestV1;
-  manifest.metadata.projectId = "night-signal-testnet";
+  manifest.metadata.projectId = "night-signal-canary";
+  manifest.metadata.creatorWallet = "0x1111111111111111111111111111111111111111";
   manifest.metadata.name = "Night Signal";
   manifest.metadata.symbol = "SIGNAL";
   manifest.metadata.publication.summary = "A community-built signal token launched through the HOODED society.";
   manifest.metadata.publication.description = "Night Signal demonstrates fixed supply, pro-rata allocation, versioned metadata, transparent fees, and permanently locked liquidity.";
-  manifest.metadata.publication.utility = "Community coordination and testnet launch-system validation.";
+  manifest.metadata.publication.utility = "Community coordination and owner-only mainnet canary validation.";
   return manifest;
 }
 
@@ -42,7 +43,7 @@ export function LaunchBayWorkbench() {
     setManifest((current) => ({ ...current, metadata: { ...current.metadata, chain }, sale: { ...current.sale, quoteAsset }, liquidity: { venue, permanentlyLocked: true } } as LaunchManifestV1));
   }
 
-  const chainId = manifest.metadata.chain === "robinhood" ? 46630 : 84532;
+  const chainId = manifest.metadata.chain === "robinhood" ? 4663 : 8453;
   const distributionPreview = manifest.metadata.chain === "solana" ? buildMetaplexMetadata(manifest.metadata) : manifest.metadata.tokenAddress ? buildUniswapTokenList(manifest.metadata, chainId) : { tokenList: "Generated after deterministic contract address is prepared", dexScreener: "Profile package staged after deployment" };
   const dexPreview = manifest.metadata.tokenAddress ? buildDexScreenerProfile(manifest.metadata) : null;
 
@@ -59,12 +60,12 @@ export function LaunchBayWorkbench() {
         </div>
         <div className="launch-audit launch-audit--tabs">
           <div className="launch-view-tabs"><button className={view === "audit" ? "is-active" : ""} onClick={() => setView("audit")}>12 GATES</button><button className={view === "metadata" ? "is-active" : ""} onClick={() => setView("metadata")}>METADATA</button><button className={view === "simulation" ? "is-active" : ""} onClick={() => setView("simulation")}>SIM</button></div>
-          {view === "audit" && <><div className="launch-score"><span>MANIFEST READINESS</span><strong>{validation.passed}/{validation.total}</strong><b className={validation.ready ? "is-ready" : "is-blocked"}>{validation.ready ? "TESTNET REVIEW READY" : "BLOCKED"}</b></div><div className="launch-checks launch-checks--dense">{validation.checks.map((check) => <div key={check.id} className={check.passed ? "is-pass" : "is-fail"} title={check.detail}><i>{check.passed ? "✓" : "×"}</i><span>{check.label}</span></div>)}</div></>}
+          {view === "audit" && <><div className="launch-score"><span>MANIFEST READINESS</span><strong>{validation.passed}/{validation.total}</strong><b className={validation.ready ? "is-ready" : "is-blocked"}>{validation.ready ? "CANARY REVIEW READY" : "BLOCKED"}</b></div><div className="launch-checks launch-checks--dense">{validation.checks.map((check) => <div key={check.id} className={check.passed ? "is-pass" : "is-fail"} title={check.detail}><i>{check.passed ? "✓" : "×"}</i><span>{check.label}</span></div>)}</div></>}
           {view === "metadata" && <div className="metadata-preview"><b>MAX-EXPOSURE PACKAGE</b><p>Metaplex · Uniswap List · Blockscout · DEX Screener · CoinGecko · OG 1200×630</p><pre>{JSON.stringify(distributionPreview, null, 2).slice(0, 600)}</pre>{dexPreview && <small>DEX profile ready</small>}</div>}
           {view === "simulation" && <div className="simulation-preview"><b>OVERSUBSCRIBED // SAME PRICE</b>{simulation.wallets.map((wallet) => <div key={wallet.wallet}><span>{wallet.wallet}</span><strong>{wallet.tokenAllocation.toString()} TOKEN</strong><small>{wallet.refund.toString()} REFUND</small></div>)}</div>}
         </div>
       </div>
-      <div className="launch-pipeline launch-pipeline--v1"><span>DRAFT</span><i>→</i><span>METADATA</span><i>→</i><span>SANDBOX</span><i>→</i><span>PEER + SECURITY</span><i>→</i><span>TESTNET</span><button disabled={!validation.ready} onClick={() => setSubmitted(true)}>{submitted ? "✓ REVIEW PACKAGE SEALED" : "QUEUE GATED PROPOSAL"}</button></div>
+      <div className="launch-pipeline launch-pipeline--v1"><span>DRAFT</span><i>→</i><span>LOCAL + FORK</span><i>→</i><span>SECURITY</span><i>→</i><span>MAINNET SIM</span><i>→</i><span>OWNER CANARY</span><button disabled={!validation.ready} onClick={() => setSubmitted(true)}>{submitted ? "✓ CANARY PACKAGE SEALED" : "QUEUE OWNER CANARY"}</button></div>
     </div>
   );
 }

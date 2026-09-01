@@ -61,6 +61,30 @@ contract ProRataFairLaunchTest {
         assert(ALICE.balance == 10 ether);
     }
 
+    function testSuccessfulContributionCanBeSettledPermissionlessly() public {
+        (FixedSupplyLaunchToken token, ProRataFairLaunch sale) = _nativeSale(20 ether, 100 ether, 100 ether, 0);
+        vm.deal(ALICE, 20 ether);
+        vm.warp(100);
+        vm.prank(ALICE);
+        sale.contribute{value: 20 ether}(address(0));
+        vm.warp(201);
+        vm.prank(BOB);
+        sale.settleFor(ALICE);
+        assert(token.balanceOf(ALICE) == 200 ether);
+        assert(sale.totalSettledContribution() == 20 ether);
+    }
+
+    function testUnsoldTokensCannotMoveBeforeEveryContributionSettles() public {
+        (, ProRataFairLaunch sale) = _nativeSale(20 ether, 100 ether, 100 ether, 0);
+        vm.deal(ALICE, 20 ether);
+        vm.warp(100);
+        vm.prank(ALICE);
+        sale.contribute{value: 20 ether}(address(0));
+        vm.warp(401);
+        vm.expectRevert(bytes("unsettled contributions"));
+        sale.sweepUnsold();
+    }
+
     function testCouncilPauseExpiresIntoRefundMode() public {
         (, ProRataFairLaunch sale) = _nativeSale(1 ether, 100 ether, 25 ether, 0);
         vm.deal(ALICE, 25 ether);
@@ -76,10 +100,24 @@ contract ProRataFairLaunchTest {
     }
 
     function testFeeCannotExceedOnePercent() public {
-        FixedSupplyLaunchToken token = new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this));
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("manifest"));
         ProRataFairLaunch.Config memory config = _config(address(token), 1 ether, 100 ether, 25 ether, 101);
         vm.expectRevert(bytes("fee cap"));
         new ProRataFairLaunch(config);
+    }
+
+    function testSaleStartsSealedAndOnlyCreatorCanActivate() public {
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("sealed-manifest"));
+        ProRataFairLaunch sale = new ProRataFairLaunch(_config(address(token), 20 ether, 100 ether, 100 ether, 0));
+        token.transfer(address(sale), 1_000 ether);
+        assert(!sale.activated());
+        vm.expectRevert(bytes("not creator"));
+        vm.prank(ALICE);
+        sale.activate();
+        sale.activate();
+        assert(sale.activated());
     }
 
     function testFuzzPreviewNeverAllocatesMoreThanSale(uint96 a, uint96 b) public {
@@ -103,9 +141,10 @@ contract ProRataFairLaunchTest {
         internal
         returns (FixedSupplyLaunchToken token, ProRataFairLaunch sale)
     {
-        token = new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this));
+        token = new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("manifest"));
         sale = new ProRataFairLaunch(_config(address(token), minRaise, maxRaise, cap, feeBps));
         token.transfer(address(sale), 1_000 ether);
+        sale.activate();
     }
 
     function _config(address token, uint256 minRaise, uint256 maxRaise, uint256 cap, uint16 feeBps)
@@ -117,6 +156,7 @@ contract ProRataFairLaunchTest {
             saleToken: token,
             quoteToken: address(0),
             saleAllocation: 1_000 ether,
+            pricePerToken: maxRaise / 1_000,
             minimumRaise: minRaise,
             maximumRaise: maxRaise,
             walletCap: cap,

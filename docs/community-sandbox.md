@@ -26,7 +26,7 @@ PostgreSQL stores sessions, run evidence, proposal state, and review attestation
 
 - Apply `docs/schema.sql` to a non-production database and test row-level ownership checks.
 - Create the Vercel snapshots and record their tool manifests and SHA-256 build hashes.
-- Set the RH testnet RPC, `$HOODED`, and Genesis NFT addresses.
+- Set the mainnet read-only RPC, `$HOODED`, and Genesis NFT addresses only after their verified deployment receipts are published.
 - Set `SANDBOX_BASE_COMMIT` to the full SHA of the reviewed protected-branch revision.
 - Use a 32+ character random `SOCIETY_SESSION_SECRET`.
 - Verify sandbox egress denial, resource limits, cross-user denial, expiration, and idempotent retries.

@@ -100,7 +100,7 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
   await expect(page.getByRole("dialog", { name: "Code Bazaar panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Code Bazaar" })).toBeVisible();
   await expect(page.getByText("FOUNDRY-01 // FIRST SOCIETY PROJECT")).toBeVisible();
-  await expect(page.getByText("v0.1.0-testnet")).toBeVisible();
+  await expect(page.getByText("v0.2.0-mainnet-canary")).toBeVisible();
   await page.getByRole("button", { name: "Run policy suite" }).click();
   await expect(page.getByText("5/5 CHECKS PASSED")).toBeVisible();
   await page.getByRole("button", { name: "OPEN BOUNTIES" }).click();
@@ -113,9 +113,9 @@ test("Launch Bay validates a tri-chain pro-rata manifest and seals its review pa
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
   await page.getByRole("button", { name: "Open Launch Bay" }).click();
   await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Night Signal");
-  await expect(page.getByText("12/12")).toBeVisible();
-  await page.getByRole("button", { name: "Queue gated proposal" }).click();
-  await expect(page.getByRole("button", { name: /review package sealed/i })).toBeVisible();
+  await expect(page.getByText("13/13")).toBeVisible();
+  await page.getByRole("button", { name: "Queue owner canary" }).click();
+  await expect(page.getByRole("button", { name: /canary package sealed/i })).toBeVisible();
   await page.getByRole("button", { name: "SOLANA" }).click();
   await expect(page.getByRole("textbox", { name: "Quote asset" })).toHaveValue("SOL");
   await page.getByRole("button", { name: "METADATA" }).click();

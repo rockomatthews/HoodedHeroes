@@ -1,11 +1,134 @@
+import { createPublicClient, encodeFunctionData, getAddress, http, isAddress, keccak256, stringToHex, type Address, type Hex } from "viem";
+import { z } from "zod";
 import { validateLaunchManifest, type LaunchManifestV1 } from "@hooded/shared";
+import { canaryModeEnabled, configuredCanaryOwner, isLaunchCanaryOwner } from "@/lib/server/launch-canary";
+import { assertSameOrigin, publicError, requireIdempotencyKey } from "@/lib/server/request-security";
+import { getSocietySession } from "@/lib/server/session";
+
+export const runtime = "nodejs";
+
+const address = z.string().refine(isAddress, "Invalid address");
+const executionSchema = z.object({
+  quoteToken: address,
+  securityCouncil: address,
+  proceedsRecipient: address,
+  operationsRecipient: address,
+  rewardsFeeRecipient: address,
+  referralRegistry: address,
+  unsoldRecipient: address,
+  liquidityRecipient: address,
+  creatorVestingRecipient: address,
+  rewardsAllocationRecipient: address,
+  treasuryRecipient: address,
+  claimDeadline: z.string().datetime(),
+});
+const requestSchema = z.object({ manifest: z.custom<LaunchManifestV1>(), execution: executionSchema });
+
+const saleComponents = [
+  { name: "saleToken", type: "address" }, { name: "quoteToken", type: "address" }, { name: "saleAllocation", type: "uint256" }, { name: "pricePerToken", type: "uint256" },
+  { name: "minimumRaise", type: "uint256" }, { name: "maximumRaise", type: "uint256" }, { name: "walletCap", type: "uint256" },
+  { name: "startsAt", type: "uint64" }, { name: "endsAt", type: "uint64" }, { name: "claimDeadline", type: "uint64" },
+  { name: "saleFeeBps", type: "uint16" }, { name: "creator", type: "address" }, { name: "securityCouncil", type: "address" },
+  { name: "proceedsRecipient", type: "address" }, { name: "operationsRecipient", type: "address" }, { name: "rewardsRecipient", type: "address" },
+  { name: "referralRegistry", type: "address" }, { name: "unsoldRecipient", type: "address" },
+] as const;
+const tokenComponents = [{ name: "name", type: "string" }, { name: "symbol", type: "string" }, { name: "supply", type: "uint256" }, { name: "manifestHash", type: "bytes32" }] as const;
+const factoryAbi = [{
+  type: "function", name: "createLaunch", stateMutability: "nonpayable",
+  inputs: [
+    { name: "tokenConfig", type: "tuple", components: tokenComponents },
+    { name: "saleConfig", type: "tuple", components: saleComponents },
+    { name: "otherAllocations", type: "tuple[]", components: [{ name: "recipient", type: "address" }, { name: "amount", type: "uint256" }] },
+  ],
+  outputs: [{ name: "tokenAddress", type: "address" }, { name: "fairLaunchAddress", type: "address" }],
+}, {
+  type: "function", name: "predictAddresses", stateMutability: "view",
+  inputs: [{ name: "tokenConfig", type: "tuple", components: tokenComponents }, { name: "saleConfig", type: "tuple", components: saleComponents }],
+  outputs: [{ name: "tokenAddress", type: "address" }, { name: "fairLaunchAddress", type: "address" }],
+}, {
+  type: "function", name: "canaryCreator", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
+}] as const;
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+}
+
+function chainConfiguration(chain: LaunchManifestV1["metadata"]["chain"]) {
+  if (chain === "solana") throw new Response("The Solana mainnet program is not implemented", { status: 501 });
+  const robinhood = chain === "robinhood";
+  const rpcUrl = robinhood ? process.env.RH_RPC_URL : process.env.BASE_RPC_URL;
+  const factoryAddress = robinhood ? process.env.RH_LAUNCH_FACTORY_ADDRESS : process.env.BASE_LAUNCH_FACTORY_ADDRESS;
+  const expectedCodeHash = robinhood ? process.env.RH_LAUNCH_FACTORY_CODE_HASH : process.env.BASE_LAUNCH_FACTORY_CODE_HASH;
+  if (!rpcUrl || !factoryAddress || !expectedCodeHash || !isAddress(factoryAddress) || !/^0x[a-fA-F0-9]{64}$/.test(expectedCodeHash)) {
+    throw new Response("The verified mainnet canary factory is not configured", { status: 503 });
+  }
+  return { chainId: robinhood ? 4663 : 8453, rpcUrl, factoryAddress: getAddress(factoryAddress), expectedCodeHash: expectedCodeHash.toLowerCase() as Hex };
+}
+
+function exactAllocation(supply: bigint, bps: number) {
+  const numerator = supply * BigInt(bps);
+  if (numerator % 10_000n !== 0n) throw new Response("Supply cannot be divided exactly across manifest allocations", { status: 422 });
+  return numerator / 10_000n;
+}
 
 export async function POST(request: Request) {
-  const manifest = await request.json() as LaunchManifestV1;
-  const validation = validateLaunchManifest(manifest);
-  if (!validation.ready) return Response.json({ error: "Manifest is blocked", validation }, { status: 422 });
-  const factory = manifest.metadata.chain === "base" ? process.env.BASE_LAUNCH_FACTORY_ADDRESS : manifest.metadata.chain === "robinhood" ? process.env.RH_LAUNCH_FACTORY_ADDRESS : process.env.SOLANA_LAUNCH_PROGRAM_ID;
-  if (!factory) return Response.json({ prepared: false, reason: "The audited testnet factory/program address is not configured. No transaction was generated.", validation }, { status: 503 });
-  if (manifest.lifecycle !== "testnet-proven" && manifest.lifecycle !== "mainnet-eligible") return Response.json({ prepared: false, reason: "The proposal has not completed the required review lifecycle.", validation }, { status: 403 });
-  return Response.json({ prepared: false, reason: "Transaction encoding remains disabled until the configured deployment is verified against the audited build hash.", factory, validation }, { status: 503 });
+  try {
+    assertSameOrigin(request);
+    const idempotencyKey = requireIdempotencyKey(request);
+    const session = await getSocietySession();
+    if (!session || !isLaunchCanaryOwner(session.wallet) || !canaryModeEnabled()) return Response.json({ error: "Owner-only mainnet canary preparation is disabled" }, { status: 403 });
+    const owner = configuredCanaryOwner();
+    if (!owner) return Response.json({ error: "The canary owner is not configured" }, { status: 503 });
+    const { manifest, execution } = requestSchema.parse(await request.json());
+    const validation = validateLaunchManifest(manifest);
+    if (!validation.ready) return Response.json({ error: "Manifest is blocked", validation }, { status: 422 });
+    if (manifest.environment !== "mainnet-canary" || manifest.lifecycle !== "canary-ready") return Response.json({ error: "The manifest has not reached the owner-only canary-ready gate", validation }, { status: 403 });
+    if (manifest.metadata.creatorWallet.toLowerCase() !== owner.toLowerCase()) return Response.json({ error: "Manifest creator does not match the canary owner" }, { status: 403 });
+
+    const network = chainConfiguration(manifest.metadata.chain);
+    const client = createPublicClient({ transport: http(network.rpcUrl) });
+    const code = await client.getCode({ address: network.factoryAddress });
+    if (!code || keccak256(code).toLowerCase() !== network.expectedCodeHash) return Response.json({ error: "Factory bytecode does not match the reviewed mainnet canary build" }, { status: 409 });
+    const onchainOwner = await client.readContract({ address: network.factoryAddress, abi: factoryAbi, functionName: "canaryCreator" });
+    if (getAddress(onchainOwner) !== owner) return Response.json({ error: "Factory canary owner does not match the signed owner" }, { status: 409 });
+
+    const supply = BigInt(manifest.metadata.exactSupply);
+    const manifestHash = keccak256(stringToHex(canonicalJson(manifest)));
+    const tokenConfig = { name: manifest.metadata.name, symbol: manifest.metadata.symbol, supply, manifestHash };
+    const saleConfig = {
+      saleToken: "0x0000000000000000000000000000000000000000" as Address,
+      quoteToken: getAddress(execution.quoteToken), saleAllocation: exactAllocation(supply, manifest.sale.saleAllocationBps), pricePerToken: BigInt(manifest.sale.pricePerToken),
+      minimumRaise: BigInt(manifest.sale.minimumRaise), maximumRaise: BigInt(manifest.sale.maximumRaise), walletCap: BigInt(manifest.sale.maximumContributionPerWallet),
+      startsAt: BigInt(Math.floor(Date.parse(manifest.sale.startsAt) / 1_000)), endsAt: BigInt(Math.floor(Date.parse(manifest.sale.endsAt) / 1_000)), claimDeadline: BigInt(Math.floor(Date.parse(execution.claimDeadline) / 1_000)),
+      saleFeeBps: manifest.fees.saleFeeBps, creator: "0x0000000000000000000000000000000000000000" as Address,
+      securityCouncil: getAddress(execution.securityCouncil), proceedsRecipient: getAddress(execution.proceedsRecipient), operationsRecipient: getAddress(execution.operationsRecipient),
+      rewardsRecipient: getAddress(execution.rewardsFeeRecipient), referralRegistry: getAddress(execution.referralRegistry), unsoldRecipient: getAddress(execution.unsoldRecipient),
+    };
+    if (saleConfig.claimDeadline <= saleConfig.endsAt) return Response.json({ error: "Claim deadline must follow the sale window" }, { status: 422 });
+    const otherAllocations = [
+      { recipient: getAddress(execution.liquidityRecipient), amount: exactAllocation(supply, manifest.sale.liquidityAllocationBps) },
+      { recipient: getAddress(execution.creatorVestingRecipient), amount: exactAllocation(supply, manifest.sale.creatorAllocationBps) },
+      { recipient: getAddress(execution.rewardsAllocationRecipient), amount: exactAllocation(supply, manifest.sale.rewardsAllocationBps) },
+      { recipient: getAddress(execution.treasuryRecipient), amount: exactAllocation(supply, manifest.sale.treasuryAllocationBps) },
+    ].filter((item) => item.amount > 0n);
+    const args = [tokenConfig, saleConfig, otherAllocations] as const;
+    const data = encodeFunctionData({ abi: factoryAbi, functionName: "createLaunch", args });
+    const [predictedToken, predictedSale] = await client.readContract({ address: network.factoryAddress, abi: factoryAbi, functionName: "predictAddresses", args: [tokenConfig, saleConfig] });
+    await client.call({ account: owner, to: network.factoryAddress, data });
+    const gas = await client.estimateGas({ account: owner, to: network.factoryAddress, data });
+
+    return Response.json({
+      prepared: true,
+      unsigned: { chainId: network.chainId, from: owner, to: network.factoryAddress, data, value: "0", gas: gas.toString() },
+      receipt: { manifestHash, factoryCodeHash: network.expectedCodeHash, predictedToken, predictedSale, sealedAtCreation: true, publicActivationTransactionRequired: true },
+      idempotencyKey,
+      warning: "This is an unsigned mainnet transaction. HOODED never broadcasts it or stores a private key.",
+      validation,
+    });
+  } catch (error) {
+    return publicError(error);
+  }
 }

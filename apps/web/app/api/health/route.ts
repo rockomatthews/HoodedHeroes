@@ -1,3 +1,3 @@
 export function GET() {
-  return Response.json({ service: "hooded-web", status: "ok", mode: "prototype", chain: "Robinhood Chain testnet pending" });
+  return Response.json({ service: "hooded-web", status: "ok", mode: "owner-only-mainnet-canary", chain: "No deployment configured" });
 }

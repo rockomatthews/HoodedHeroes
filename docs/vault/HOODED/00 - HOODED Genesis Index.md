@@ -20,4 +20,4 @@
 - Hero prices: 100,000 / 250,000 / 500,000 / 1,000,000 HOODED by fixed tier.
 - Genesis supply: 2,200 Recruit, 600 Specialist, 180 Vanguard, 20 Icon.
 
-The current manifest contains placeholders and is testnet-only. No token address, sale, or deployment is live until independently verified and explicitly approved.
+The current mainnet-canary manifest contains placeholders. No token address, sale, or deployment is live until independently verified and explicitly approved. Creation remains owner-only and sealed from public contributions.

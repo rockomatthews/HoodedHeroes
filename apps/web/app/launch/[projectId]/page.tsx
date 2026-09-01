@@ -51,7 +51,7 @@ export default async function PublicLaunchPage({ params }: Props) {
         <div className="public-launch-grid">
           <section><h3>ONE BILLION. NO MORE.</h3><div className="supply-number">1,000,000,000</div><p>No future mint, freeze, blacklist, transfer tax, or arbitrary upgrade authority.</p><div className="authority-stamps"><b>FIXED</b><b>AGPL</b><b>PRO-RATA</b><b>LOCKED LP</b></div></section>
           <section><h3>GENESIS DISTRIBUTION</h3>{allocations.map(([label, bps]) => <div className="allocation-row" key={label}><span>{label}</span><i><b style={{ width: `${bps / 100}%` }} /></i><strong>{bps / 100}%</strong></div>)}</section>
-          <section><h3>THE ACCESS SEQUENCE</h3><ol><li><b>01</b><span>Audits, legal controls, and testnet exercises</span></li><li><b>02</b><span>Public vestibule fair-launch window</span></li><li><b>03</b><span>25,000 HOODED unlocks society preview</span></li><li><b>04</b><span>A Genesis Hero unlocks builder access</span></li></ol></section>
+          <section><h3>THE ACCESS SEQUENCE</h3><ol><li><b>01</b><span>Audits, legal controls, local tests, and mainnet-fork exercises</span></li><li><b>02</b><span>Owner-only sealed mainnet canary</span></li><li><b>03</b><span>Separate public activation after verified readback</span></li><li><b>04</b><span>25,000 HOODED unlocks society preview</span></li></ol></section>
         </div>
         <footer className="public-launch-footer"><p>{launch.metadata.publication.riskDisclosure}</p><button disabled>CONTRIBUTIONS NOT OPEN</button></footer>
       </section>

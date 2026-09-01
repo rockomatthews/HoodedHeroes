@@ -22,7 +22,7 @@ const CREED_MESSAGES: SignalMessage[] = [
 const CHANNEL_INTROS: Record<ChannelId, SignalMessage[]> = {
   society: CREED_MESSAGES,
   builders: [{ id: "builders-intro", author: "CODE BAZAAR", body: "Share reproducible evidence, ask for review, and leave every module stronger than you found it.", createdAt: "PINNED" }],
-  "launch-review": [{ id: "launch-intro", author: "LAUNCH BAY", body: "Review manifests, simulations, fees, disclosures, and testnet evidence before any proposal advances.", createdAt: "PINNED" }],
+  "launch-review": [{ id: "launch-intro", author: "LAUNCH BAY", body: "Review manifests, simulations, fees, disclosures, and mainnet-fork evidence before any owner canary advances.", createdAt: "PINNED" }],
   "house-relay": [{ id: "houses-intro", author: "SIX-HOUSE RELAY", body: "Coordinate missions across every house. Rivalry ends where the city needs all of us.", createdAt: "PINNED" }],
 };
 

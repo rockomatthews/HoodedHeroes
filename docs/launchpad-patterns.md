@@ -34,8 +34,8 @@ Primary references:
 
 | Pattern | HOODED translation |
 |---|---|
-| Discoverable registry | Launch Bay project grid with new, review, testnet, graduated, and rejected filters |
-| Transparent lifecycle | Draft → Code Bazaar → analysis/fuzz → independent review → hero vote → council → testnet |
+| Discoverable registry | Launch Bay project grid with draft, review, canary, verified, public, and rejected filters |
+| Transparent lifecycle | Draft → Code Bazaar → analysis/fuzz → independent review → fork proof → simulation → owner canary |
 | Visible thresholds | Minimum raise, contribution cap, graduation threshold, allocation chart, and funded-liquidity status |
 | Non-custodial intent | EIP-712 proposal and approval signatures; no token or treasury movement when drafting |
 | Executable previews | Deterministic transaction simulation with net amounts, slippage/floor, roles, and exact contract bytecode hash |
@@ -57,4 +57,4 @@ Primary references:
 
 The Launch Bay interface now implements an original proposal validator shared across the app. It supports safe-fixed and fair-curve proposal modes, HOODED or ETH quote assets, immutable supply, allocation controls, minimum raise, graduation threshold, wallet caps, twelve-month creator vesting, and permanent-liquidity requirements.
 
-The interface is a simulation and review surface. It does not deploy contracts or accept funds. The production execution layer remains separately gated behind authenticated heroes, Vercel Sandbox isolation for build/test work, audited Solidity templates, Safe/timelock approvals, and Robinhood Chain testnet rehearsal.
+The interface is a simulation and review surface. It does not deploy contracts or accept funds. The execution layer remains separately gated behind the signed canary owner, Vercel Sandbox isolation, audited Solidity templates, Safe/timelock approvals, mainnet-fork rehearsal, exact bytecode verification, and a decoded unsigned simulation.

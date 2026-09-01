@@ -12,7 +12,8 @@ contract TokenVestingVaultTest {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     function testLinearReleaseCannotExceedCommittedAllocation() public {
-        FixedSupplyLaunchToken token = new FixedSupplyLaunchToken("Launch", "LCH", 1_000 ether, address(this));
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Launch", "LCH", 1_000 ether, address(this), keccak256("manifest"));
         uint64 start = uint64(block.timestamp + 1 days);
         uint64 duration = 24 * 30 days;
         address beneficiary = address(0xBEEF);
@@ -33,7 +34,8 @@ contract TokenVestingVaultTest {
     }
 
     function testFuzzVestedAmountIsBounded(uint64 elapsed) public {
-        FixedSupplyLaunchToken token = new FixedSupplyLaunchToken("Launch", "LCH", 1_000 ether, address(this));
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Launch", "LCH", 1_000 ether, address(this), keccak256("manifest"));
         uint64 start = uint64(block.timestamp + 1 days);
         uint64 duration = 365 days;
         TokenVestingVault vault = new TokenVestingVault(address(token), address(0xBEEF), start, duration, 100 ether);
@@ -43,4 +45,3 @@ contract TokenVestingVaultTest {
         if (elapsed >= duration) assert(vested == 100 ether);
     }
 }
-
