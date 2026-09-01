@@ -22,12 +22,17 @@ function run(command, args, options = {}) {
 
 const rpcUrl = process.env.RH_RPC_URL || localValue("RH_RPC_URL");
 const owner = process.env.LAUNCH_CANARY_OWNER_ADDRESS || localValue("LAUNCH_CANARY_OWNER_ADDRESS");
+const deployer = process.env.RH_FACTORY_DEPLOYER_ADDRESS || localValue("RH_FACTORY_DEPLOYER_ADDRESS") || owner;
 if (!rpcUrl) {
   console.error("Robinhood factory plan failed: RH_RPC_URL is required in .env.local");
   process.exit(1);
 }
 if (!owner || !ADDRESS.test(owner) || ZERO_ADDRESS.test(owner)) {
   console.error("Robinhood factory plan failed: LAUNCH_CANARY_OWNER_ADDRESS must be one nonzero EVM wallet in .env.local");
+  process.exit(1);
+}
+if (!deployer || !ADDRESS.test(deployer) || ZERO_ADDRESS.test(deployer)) {
+  console.error("Robinhood factory plan failed: RH_FACTORY_DEPLOYER_ADDRESS must be one nonzero EVM wallet when configured");
   process.exit(1);
 }
 const endpoint = new URL(rpcUrl);
@@ -76,17 +81,17 @@ try {
   const [chainHex, gasPriceHex, nonceHex, balanceHex, estimatedGasHex] = await Promise.all([
     rpc("eth_chainId"),
     rpc("eth_gasPrice"),
-    rpc("eth_getTransactionCount", [owner, "pending"]),
-    rpc("eth_getBalance", [owner, "latest"]),
+    rpc("eth_getTransactionCount", [deployer, "pending"]),
+    rpc("eth_getBalance", [deployer, "latest"]),
     rpc("eth_estimateGas", [{ data: initCode }]),
   ]);
   const chainId = Number.parseInt(chainHex, 16);
   const gasPrice = quantity(gasPriceHex);
   const nonce = quantity(nonceHex);
-  const ownerBalance = quantity(balanceHex);
+  const deployerBalance = quantity(balanceHex);
   const estimatedGas = quantity(estimatedGasHex);
   const estimatedCost = estimatedGas * gasPrice;
-  const computed = run("cast", ["compute-address", "--nonce", nonce.toString(), owner]);
+  const computed = run("cast", ["compute-address", "--nonce", nonce.toString(), deployer]);
   const predictedFactory = computed.match(/0x[a-fA-F0-9]{40}/)?.[0];
   if (!predictedFactory) throw new Error("Could not calculate the factory address");
 
@@ -95,22 +100,23 @@ try {
     chain: "robinhood",
     chainId,
     expectedChainId: EXPECTED_CHAIN_ID,
-    owner,
-    ownerNonce: nonce.toString(),
-    ownerBalanceWei: ownerBalance.toString(),
+    canaryOwner: owner,
+    factoryDeployer: deployer,
+    deployerNonce: nonce.toString(),
+    deployerBalanceWei: deployerBalance.toString(),
     predictedFactory,
     estimatedGas: estimatedGas.toString(),
     gasPriceWei: gasPrice.toString(),
     estimatedMaximumCostWei: estimatedCost.toString(),
     estimatedMaximumCostEth: formatEth(estimatedCost),
-    ownerAppearsFunded: ownerBalance >= estimatedCost,
+    deployerAppearsFunded: deployerBalance >= estimatedCost,
     creationCodeKeccak256: run("cast", ["keccak", creationCode]),
     runtimeCodeKeccak256: run("cast", ["keccak", runtimeCode]),
     initCodeSha256: createHash("sha256").update(initCode).digest("hex"),
     broadcasts: false,
     requiresExplicitBroadcastApproval: true,
   };
-  console.log(JSON.stringify({ ...evidence, ready: chainId === EXPECTED_CHAIN_ID && evidence.ownerAppearsFunded }, null, 2));
+  console.log(JSON.stringify({ ...evidence, ready: chainId === EXPECTED_CHAIN_ID && evidence.deployerAppearsFunded }, null, 2));
   if (chainId !== EXPECTED_CHAIN_ID) process.exitCode = 1;
 } catch (error) {
   console.error(`Robinhood factory plan failed: ${error instanceof Error ? error.message : "unknown error"}`);
