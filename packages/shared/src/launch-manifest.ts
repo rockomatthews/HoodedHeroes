@@ -15,7 +15,7 @@ export type LaunchLifecycle =
   | "public-eligible";
 
 export type LaunchMetadataV1 = {
-  schemaVersion: "1.2.0";
+  schemaVersion: "1.3.0";
   projectId: string;
   chain: LaunchChain;
   tokenAddress?: string;
@@ -27,7 +27,7 @@ export type LaunchMetadataV1 = {
   sourceCommit: string;
   buildHash: string;
   immutableCoreHash: string;
-  factoryVersion: "1.2.0";
+  factoryVersion: "1.3.0";
   license: "AGPL-3.0-or-later";
   canonicalLaunchUrl: string;
   explorerUrl?: string;
@@ -69,7 +69,7 @@ export type LaunchMetadataV1 = {
 };
 
 export type LaunchManifestV1 = {
-  manifestVersion: "1.2.0";
+  manifestVersion: "1.3.0";
   environment: LaunchEnvironment;
   launchClass: LaunchClass;
   lifecycle: LaunchLifecycle;
@@ -210,12 +210,12 @@ export function validateLaunchManifest(manifest: LaunchManifestV1) {
 }
 
 export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
-  manifestVersion: "1.2.0",
+  manifestVersion: "1.3.0",
   environment: "mainnet",
   launchClass: "production",
   lifecycle: "draft",
   metadata: {
-    schemaVersion: "1.2.0",
+    schemaVersion: "1.3.0",
     projectId: "hooded-genesis",
     chain: "robinhood",
     name: "HOODED",
@@ -226,7 +226,7 @@ export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
     sourceCommit: "0000000",
     buildHash: "0".repeat(64),
     immutableCoreHash: "0".repeat(64),
-    factoryVersion: "1.2.0",
+    factoryVersion: "1.3.0",
     license: "AGPL-3.0-or-later",
     canonicalLaunchUrl: "https://hooded.world/launch/hooded-genesis",
     authorities: { futureMint: false, freeze: false, blacklist: false, mutableTax: false, arbitraryUpgrade: false },

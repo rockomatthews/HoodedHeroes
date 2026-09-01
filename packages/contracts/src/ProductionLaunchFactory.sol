@@ -4,6 +4,7 @@ pragma solidity 0.8.27;
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {FixedSupplyLaunchToken} from "./FixedSupplyLaunchToken.sol";
 import {ProRataFairLaunch} from "./ProRataFairLaunch.sol";
 import {RobinhoodLiquidityCoordinator} from "./RobinhoodLiquidityCoordinator.sol";
@@ -14,8 +15,11 @@ import {TokenVestingVault} from "./TokenVestingVault.sol";
 contract ProductionLaunchFactory is EIP712 {
     using SafeERC20 for FixedSupplyLaunchToken;
 
-    string public constant TEMPLATE_VERSION = "1.2.0";
+    string public constant TEMPLATE_VERSION = "1.3.0";
     uint64 public constant MIN_COMMUNITY_VESTING_DURATION = 730 days;
+    uint256 public constant MIN_VESTED_SUPPLY_BPS = 500;
+    uint256 public constant MAX_VESTED_SUPPLY_BPS = 1_000;
+    uint256 private constant BPS = 10_000;
     bytes32 public constant APPROVAL_TYPEHASH = keccak256(
         "LaunchApproval(address creator,bytes32 manifestHash,bytes32 configHash,uint256 nonce,uint256 deadline)"
     );
@@ -125,6 +129,10 @@ contract ProductionLaunchFactory is EIP712 {
         require(saleConfig.quoteToken == address(0), "native quote only");
         require(saleConfig.liquidityShareBps > 0, "zero liquidity share");
         require(vestedAllocations.length > 0, "missing vested allocation");
+        require(saleConfig.pricePerToken > 0, "zero price");
+        uint256 maximumLiquidityQuote = Math.mulDiv(saleConfig.maximumRaise, saleConfig.liquidityShareBps, BPS);
+        uint256 requiredLiquidityTokens = Math.mulDiv(maximumLiquidityQuote, 1 ether, saleConfig.pricePerToken);
+        require(liquidityConfig.tokenAllocation >= requiredLiquidityTokens, "liquidity allocation too small");
         bytes32 tokenSalt = keccak256(abi.encode(tokenConfig.manifestHash, "TOKEN"));
         FixedSupplyLaunchToken token = new FixedSupplyLaunchToken{salt: tokenSalt}(
             tokenConfig.name, tokenConfig.symbol, tokenConfig.supply, address(this), tokenConfig.manifestHash
@@ -147,6 +155,7 @@ contract ProductionLaunchFactory is EIP712 {
             allocated += otherAllocations[i].amount;
             token.safeTransfer(otherAllocations[i].recipient, otherAllocations[i].amount);
         }
+        uint256 totalVested = 0;
         for (uint256 i; i < vestedAllocations.length; ++i) {
             VestedAllocation calldata allocation = vestedAllocations[i];
             require(allocation.beneficiary != address(0) && allocation.amount > 0, "invalid vested allocation");
@@ -154,10 +163,11 @@ contract ProductionLaunchFactory is EIP712 {
             TokenVestingVault vault = new TokenVestingVault{
                 salt: keccak256(abi.encode(tokenConfig.manifestHash, "VESTING", i))
             }(
-                address(token), allocation.beneficiary, uint64(block.timestamp), allocation.duration, allocation.amount
+                address(token), allocation.beneficiary, saleConfig.endsAt, allocation.duration, allocation.amount
             );
             vestingVaultFor[tokenConfig.manifestHash][i] = address(vault);
             allocated += allocation.amount;
+            totalVested += allocation.amount;
             token.safeTransfer(address(vault), allocation.amount);
             emit VestingVaultCreated(
                 tokenConfig.manifestHash,
@@ -168,6 +178,13 @@ contract ProductionLaunchFactory is EIP712 {
                 allocation.duration
             );
         }
+        require(
+            totalVested >= Math.mulDiv(tokenConfig.supply, MIN_VESTED_SUPPLY_BPS, BPS, Math.Rounding.Ceil),
+            "vested allocation too small"
+        );
+        require(
+            totalVested <= Math.mulDiv(tokenConfig.supply, MAX_VESTED_SUPPLY_BPS, BPS), "vested allocation too large"
+        );
         require(allocated == tokenConfig.supply && token.balanceOf(address(this)) == 0, "allocation mismatch");
         _emitLaunch(
             address(token), address(fairLaunch), address(coordinator), address(positionLock), tokenConfig.manifestHash

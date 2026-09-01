@@ -6,7 +6,7 @@ This runbook is intentionally noncustodial. Repository scripts calculate bytecod
 
 1. Confirm the founder recipient and three 2-of-3 Safe signers out of band.
 2. Deploy/configure the Safe and seven-day DAO timelock; publish owners, threshold, modules, and delay.
-3. Freeze the v1.2 manifest, media hashes, Git commit, compiler settings, factory-created community vesting configuration, reward vault, eligibility signer, and legal/risk disclosures.
+3. Freeze the v1.3 manifest, media hashes, Git commit, compiler settings, factory-created community vesting configuration, reward vault, eligibility signer, and legal/risk disclosures.
 4. Generate the 3,000-Hero collection with `node scripts/generate-hero-collection.mjs`. Replace image-CID placeholders only after the image directory is pinned; recalculate the collection root after the final metadata directory is pinned.
 5. Record the final Hero metadata root and base URI. Do not deploy a mutable placeholder collection.
 
@@ -49,7 +49,7 @@ Repeat HLAB1 evidence, then activate the thirty-minute owner-only sale with a fo
 
 ## Gate 4 — production factory and HOODED creation
 
-1. The original auditor retests the v1.2 remediation, then two independent reviewers approve the final source and bytecode including the Uniswap v4 adapter.
+1. The original auditor retests the v1.3 follow-up remediation, then two independent reviewers approve the final source and bytecode including the Uniswap v4 adapter.
 2. Deploy and verify the approval registry/Safe, reward vault, production factory, liquidity adapter, and position manager integration. The factory creates and funds the community vesting vault as part of launch creation.
 3. Configure only verified addresses and runtime hashes in `.env`/Vercel environment variables.
 4. Change `ENABLE_PRODUCTION_LAUNCH_PREPARE` only after the infrastructure readback passes.

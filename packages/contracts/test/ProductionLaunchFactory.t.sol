@@ -127,6 +127,7 @@ contract ProductionLaunchFactoryTest {
         assert(address(vesting.token()) == tokenAddress);
         assert(vesting.beneficiary() == address(0xDA0));
         assert(vesting.duration() == 730 days);
+        assert(vesting.startsAt() == saleConfig.endsAt);
         assert(FixedSupplyLaunchToken(tokenAddress).balanceOf(address(vesting)) == 50 ether);
     }
 
@@ -190,6 +191,47 @@ contract ProductionLaunchFactoryTest {
         vm.expectRevert(bytes("vesting below minimum"));
         vm.prank(CREATOR);
         factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 10, 1_000, signature);
+    }
+
+    function testFactoryRejectsUndersizedLiquidityAndVestingOutsideFiveToTenPercent() public {
+        address approver = vm.addr(APPROVER_KEY);
+        ProductionLaunchFactory factory = new ProductionLaunchFactory(approver);
+        MockPositionManager manager = new MockPositionManager();
+        MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
+        ProductionLaunchFactory.TokenConfig memory tokenConfig =
+            ProductionLaunchFactory.TokenConfig("Launch", "LCH", 1_000 ether, keccak256("undersized-liquidity"));
+        ProRataFairLaunch.Config memory saleConfig = _saleConfig();
+        ProductionLaunchFactory.LiquidityConfig memory liquidity = _liquidity(manager, adapter);
+        ProductionLaunchFactory.Allocation[] memory direct = new ProductionLaunchFactory.Allocation[](1);
+        direct[0] = ProductionLaunchFactory.Allocation(address(0xD1), 400 ether);
+        ProductionLaunchFactory.VestedAllocation[] memory vested = new ProductionLaunchFactory.VestedAllocation[](1);
+        vested[0] = ProductionLaunchFactory.VestedAllocation(address(0xD2), 50 ether, 730 days);
+
+        liquidity.tokenAllocation = 149 ether;
+        bytes32 configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        bytes memory signature = _approval(factory, tokenConfig.manifestHash, configHash, 11, 1_000);
+        vm.expectRevert(bytes("liquidity allocation too small"));
+        vm.prank(CREATOR);
+        factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 11, 1_000, signature);
+
+        liquidity.tokenAllocation = 150 ether;
+        tokenConfig.manifestHash = keccak256("vesting-too-small");
+        direct[0].amount = 450 ether - 1;
+        vested[0].amount = 1;
+        configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        signature = _approval(factory, tokenConfig.manifestHash, configHash, 12, 1_000);
+        vm.expectRevert(bytes("vested allocation too small"));
+        vm.prank(CREATOR);
+        factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 12, 1_000, signature);
+
+        tokenConfig.manifestHash = keccak256("vesting-too-large");
+        direct[0].amount = 349 ether;
+        vested[0].amount = 101 ether;
+        configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        signature = _approval(factory, tokenConfig.manifestHash, configHash, 13, 1_000);
+        vm.expectRevert(bytes("vested allocation too large"));
+        vm.prank(CREATOR);
+        factory.createApprovedLaunch(tokenConfig, saleConfig, liquidity, direct, vested, 13, 1_000, signature);
     }
 
     function _saleConfig() private pure returns (ProRataFairLaunch.Config memory) {

@@ -1,6 +1,6 @@
 # Static-analysis disposition
 
-The initial independent source audit of commit `e9d6466` found one Critical and four High deployment blockers. They are addressed in the v1.2 remediation described in `docs/audit-remediation-2026-09-01.md`, but remain open until independent retesting. Static analysis is supporting evidence, not an audit, and no mainnet transaction may be signed against either commit.
+The independent remediation retest of `3a23535` closed the initial Critical and all four High findings, found no new Critical or High issue, and left M-1, M-2, and L-1 partially fixed. Launch Bay v1.3 addresses those three residuals as described in `docs/audit-retest-followup-2026-09-01.md`, but they remain open until the auditor retests the follow-up commit. Static analysis is supporting evidence, not an audit, and no mainnet transaction may be signed against any candidate commit.
 
 ## Slither review
 

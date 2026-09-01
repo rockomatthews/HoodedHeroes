@@ -59,6 +59,8 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
     mapping(address => bool) public settled;
     mapping(address => uint256) public authorizedAllowance;
     mapping(address => mapping(uint256 => bool)) public usedEligibilityNonce;
+    mapping(address => uint256) public minimumEligibilityNonce;
+    mapping(address => uint256) public latestEligibilityNonce;
 
     event Contributed(address indexed contributor, uint256 amount, address indexed referrer);
     event Activated(address indexed creator);
@@ -70,6 +72,7 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
     event Cancelled();
     event UnsoldSwept(uint256 amount, address indexed recipient);
     event EligibilityAuthorized(address indexed contributor, uint256 allowance, uint256 indexed nonce);
+    event EligibilityNoncesInvalidated(address indexed contributor, uint256 minimumNonce);
     event UnsoldBurned(uint256 amount);
 
     struct Config {
@@ -284,6 +287,14 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
         emit Cancelled();
     }
 
+    /// @notice The eligibility signer may permanently revoke every older permit for one contributor.
+    function invalidateEligibilityNonces(address contributor, uint256 newMinimumNonce) external {
+        require(msg.sender == eligibilitySigner, "not eligibility signer");
+        require(newMinimumNonce > minimumEligibilityNonce[contributor], "nonce floor not increased");
+        minimumEligibilityNonce[contributor] = newMinimumNonce;
+        emit EligibilityNoncesInvalidated(contributor, newMinimumNonce);
+    }
+
     function sweepUnsold() external nonReentrant {
         require(block.timestamp > claimDeadline, "claims active");
         require(totalSettledContribution == totalContributed, "unsettled contributions");
@@ -340,12 +351,15 @@ contract ProRataFairLaunch is ReentrancyGuard, EIP712 {
     ) private {
         require(eligibilitySigner != address(0), "eligibility disabled");
         require(block.timestamp <= deadline, "eligibility expired");
+        require(nonce >= minimumEligibilityNonce[contributor], "eligibility revoked");
         require(!usedEligibilityNonce[contributor][nonce], "eligibility replay");
+        require(nonce > latestEligibilityNonce[contributor], "stale eligibility nonce");
         bytes32 structHash =
             keccak256(abi.encode(ELIGIBILITY_TYPEHASH, contributor, address(this), allowance, nonce, deadline));
         address signer = ECDSA.recover(_hashTypedDataV4(structHash), signature);
         require(signer == eligibilitySigner, "invalid eligibility");
         usedEligibilityNonce[contributor][nonce] = true;
+        latestEligibilityNonce[contributor] = nonce;
         authorizedAllowance[contributor] = allowance;
         emit EligibilityAuthorized(contributor, allowance, nonce);
     }

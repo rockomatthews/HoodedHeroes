@@ -109,7 +109,7 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
   await expect(page.getByRole("dialog", { name: "Code Bazaar panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Code Bazaar" })).toBeVisible();
   await expect(page.getByText("FOUNDRY-01 // FIRST SOCIETY PROJECT")).toBeVisible();
-  await expect(page.getByText("v1.2.0-audit-remediation")).toBeVisible();
+  await expect(page.getByText("v1.3.0-retest-remediation")).toBeVisible();
   await page.getByRole("button", { name: "Hero Reward Rounds" }).click();
   await expect(page.getByText("packages/contracts/src/HeroRoundRewardVault.sol", { exact: true })).toBeVisible();
   await expect(page.getByText("○ REQUIRED // O(1) round funding")).toBeVisible();

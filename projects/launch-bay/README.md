@@ -12,7 +12,7 @@ This folder is the project's contribution front door. Production code remains in
 
 ## Current milestone
 
-`v1.2.0-audit-remediation` fixes the Critical and four High findings reported against `e9d6466`, enforces 24-month vesting on-chain, and remains a Robinhood Chain implementation candidate. It is not approved or deployed: the auditor must retest the remediation commit, and the independently reviewed Uniswap v4 adapter remains a separate deployment gate. Base and Solana remain unavailable.
+`v1.3.0-retest-remediation` retains the auditor-confirmed fixes for the Critical and four High findings, closes the three partial M-1/M-2/L-1 remediations, and remains a Robinhood Chain implementation candidate. It is not approved or deployed: the auditor must retest this follow-up commit, and the independently reviewed Uniswap v4 adapter remains a separate deployment gate. Base and Solana remain unavailable.
 
 The two rehearsal identities are permanently reserved as `HOODED LAB 01 / HLAB1` and `HOODED LAB 02 / HLAB2`. Both are experimental, have no promised value, and create no public liquidity pool.
 

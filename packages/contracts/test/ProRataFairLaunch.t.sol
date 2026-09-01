@@ -213,6 +213,63 @@ contract ProRataFairLaunchTest {
         sale.contributeWithEligibility{value: 1 ether}(address(0), allowance, nonce, deadline, signature);
     }
 
+    function testEligibilitySignerCanRevokeEveryOlderUnusedPermit() public {
+        address signer = vm.addr(SIGNER_KEY);
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("revocable-eligible"));
+        ProRataFairLaunch.Config memory config = _config(address(token), 1 ether, 100 ether, 100 ether, 0);
+        config.eligibilitySigner = signer;
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        token.transfer(address(sale), 1_000 ether);
+        sale.activate();
+        vm.deal(ALICE, 100 ether);
+        vm.warp(100);
+
+        bytes memory oldHigh = _eligibilitySignature(sale, ALICE, 80 ether, 1, 150);
+        bytes memory corrected = _eligibilitySignature(sale, ALICE, 5 ether, 2, 150);
+        vm.prank(signer);
+        sale.invalidateEligibilityNonces(ALICE, 2);
+
+        vm.prank(ALICE);
+        sale.contributeWithEligibility{value: 5 ether}(address(0), 5 ether, 2, 150, corrected);
+        vm.expectRevert(bytes("eligibility revoked"));
+        vm.prank(ALICE);
+        sale.contributeWithEligibility{value: 75 ether}(address(0), 80 ether, 1, 150, oldHigh);
+        assert(sale.authorizedAllowance(ALICE) == 5 ether);
+        assert(sale.contributed(ALICE) == 5 ether);
+
+        vm.expectRevert(bytes("not eligibility signer"));
+        vm.prank(ALICE);
+        sale.invalidateEligibilityNonces(ALICE, 3);
+        vm.expectRevert(bytes("nonce floor not increased"));
+        vm.prank(signer);
+        sale.invalidateEligibilityNonces(ALICE, 2);
+    }
+
+    function testPresentingNewerEligibilityPermitMakesOlderPermitStale() public {
+        address signer = vm.addr(SIGNER_KEY);
+        FixedSupplyLaunchToken token =
+            new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("ordered-eligible"));
+        ProRataFairLaunch.Config memory config = _config(address(token), 1 ether, 100 ether, 100 ether, 0);
+        config.eligibilitySigner = signer;
+        ProRataFairLaunch sale = new ProRataFairLaunch(config);
+        token.transfer(address(sale), 1_000 ether);
+        sale.activate();
+        vm.deal(ALICE, 100 ether);
+        vm.warp(100);
+
+        bytes memory oldHigh = _eligibilitySignature(sale, ALICE, 80 ether, 1, 150);
+        bytes memory corrected = _eligibilitySignature(sale, ALICE, 5 ether, 2, 150);
+        vm.prank(ALICE);
+        sale.contributeWithEligibility{value: 5 ether}(address(0), 5 ether, 2, 150, corrected);
+
+        vm.expectRevert(bytes("stale eligibility nonce"));
+        vm.prank(ALICE);
+        sale.contributeWithEligibility{value: 75 ether}(address(0), 80 ether, 1, 150, oldHigh);
+        assert(sale.authorizedAllowance(ALICE) == 5 ether);
+        assert(sale.contributed(ALICE) == 5 ether);
+    }
+
     function testLiquidityAndDaoProceedsAreSeparatedBeforeWithdrawal() public {
         FixedSupplyLaunchToken token =
             new FixedSupplyLaunchToken("Test", "TEST", 1_000 ether, address(this), keccak256("split"));
