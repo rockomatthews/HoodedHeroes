@@ -12,6 +12,7 @@
 - Failed launches become permissionlessly refundable.
 - Creator allocations vest for at least 12 months; the `$HOODED` contributor allocation vests for 24 months.
 - Liquidity cannot be withdrawn by a HOODED administrator.
+- A permanent position lock accepts only its constructor-bound position manager and token ID and exposes no outbound NFT, approval, rescue, ownership, or arbitrary-call function.
 
 ## Required evidence before owner canary consideration
 

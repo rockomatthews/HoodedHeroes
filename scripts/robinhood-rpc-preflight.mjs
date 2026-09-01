@@ -2,19 +2,16 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 function localValue(name) {
-  for (const file of [".env.local", ".env"]) {
-    if (!existsSync(file)) continue;
-    const line = readFileSync(file, "utf8").split(/\r?\n/).find((item) => item.startsWith(`${name}=`));
-    if (!line) continue;
-    const value = line.slice(line.indexOf("=") + 1).trim();
-    return value.replace(/^(['"])(.*)\1$/, "$2");
-  }
-  return undefined;
+  if (!existsSync(".env")) return undefined;
+  const line = readFileSync(".env", "utf8").split(/\r?\n/).find((item) => item.startsWith(`${name}=`));
+  if (!line) return undefined;
+  const value = line.slice(line.indexOf("=") + 1).trim();
+  return value.replace(/^(['"])(.*)\1$/, "$2");
 }
 
 const rpcUrl = process.env.RH_RPC_URL || localValue("RH_RPC_URL");
 if (!rpcUrl) {
-  console.error("RH_RPC_URL is not configured. Add it to .env.local or .env; never commit or paste it into logs.");
+  console.error("RH_RPC_URL is not configured. Add it to .env; never commit or paste it into logs.");
   process.exit(1);
 }
 
