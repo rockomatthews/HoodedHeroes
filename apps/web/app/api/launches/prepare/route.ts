@@ -1,9 +1,10 @@
 import { createPublicClient, encodeFunctionData, getAddress, http, isAddress, keccak256, stringToHex, type Address, type Hex } from "viem";
 import { z } from "zod";
-import { validateLaunchManifest, type LaunchManifestV1 } from "@hooded/shared";
+import { canonicalJson, validateLaunchManifest, type LaunchManifestV1 } from "@hooded/shared";
 import { canaryModeEnabled, configuredCanaryOwner, isLaunchCanaryOwner } from "@/lib/server/launch-canary";
 import { assertSameOrigin, publicError, requireIdempotencyKey } from "@/lib/server/request-security";
 import { getSocietySession } from "@/lib/server/session";
+import { metadataRevisionMatches } from "@/lib/server/manifest-integrity";
 
 export const runtime = "nodejs";
 
@@ -49,13 +50,6 @@ const factoryAbi = [{
   type: "function", name: "canaryCreator", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
 }] as const;
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  const record = value as Record<string, unknown>;
-  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
-}
-
 function chainConfiguration(chain: LaunchManifestV1["metadata"]["chain"]) {
   if (chain === "solana") throw new Response("The Solana mainnet program is not implemented", { status: 501 });
   const robinhood = chain === "robinhood";
@@ -85,6 +79,7 @@ export async function POST(request: Request) {
     const { manifest, execution } = requestSchema.parse(await request.json());
     const validation = validateLaunchManifest(manifest);
     if (!validation.ready) return Response.json({ error: "Manifest is blocked", validation }, { status: 422 });
+    if (!metadataRevisionMatches(manifest)) return Response.json({ error: "Metadata revision hash does not match the canonical publication record" }, { status: 422 });
     if (manifest.environment !== "mainnet-canary" || manifest.lifecycle !== "canary-ready") return Response.json({ error: "The manifest has not reached the owner-only canary-ready gate", validation }, { status: 403 });
     if (manifest.metadata.creatorWallet.toLowerCase() !== owner.toLowerCase()) return Response.json({ error: "Manifest creator does not match the canary owner" }, { status: 403 });
 

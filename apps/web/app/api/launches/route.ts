@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
 import { HOODED_GENESIS_MANIFEST, validateLaunchManifest, type LaunchManifestV1 } from "@hooded/shared";
 import { databaseConfigured, db } from "@/lib/server/database";
 import { getSocietySession } from "@/lib/server/session";
 import { assertSameOrigin, publicError, requireIdempotencyKey } from "@/lib/server/request-security";
 import { canaryModeEnabled, isLaunchCanaryOwner } from "@/lib/server/launch-canary";
+import { manifestRecordHash, metadataRevisionMatches } from "@/lib/server/manifest-integrity";
 
 export async function GET() {
   if (!databaseConfigured()) return Response.json({ launches: [HOODED_GENESIS_MANIFEST], source: "bundled-mainnet-canary-manifest" });
@@ -23,9 +23,10 @@ export async function POST(request: Request) {
     const manifest = await request.json() as LaunchManifestV1;
     const validation = validateLaunchManifest(manifest);
     if (!validation.ready) return Response.json({ error: "Manifest is blocked", validation }, { status: 422 });
+    if (!metadataRevisionMatches(manifest)) return Response.json({ error: "Metadata revision hash does not match the canonical publication record" }, { status: 422 });
     if (manifest.environment !== "mainnet-canary") return Response.json({ error: "Only sealed mainnet canary manifests are accepted" }, { status: 403 });
     if (manifest.metadata.creatorWallet.toLowerCase() !== session.wallet.toLowerCase()) return Response.json({ error: "Manifest creator must match the signed canary owner" }, { status: 403 });
-    const hash = createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
+    const hash = manifestRecordHash(manifest);
     const sql = db();
     const existing = await sql`select manifest, manifest_hash from launches where project_id = ${manifest.metadata.projectId} limit 1`;
     if (existing[0]) return Response.json(existing[0]);

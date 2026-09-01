@@ -1,5 +1,10 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { HOODED_GENESIS_MANIFEST, HOODED_PREVIEW_THRESHOLD, buildMetaplexMetadata, evaluateSocietyAccess, simulateProRataLaunch, validateLaunchManifest } from "@hooded/shared";
+import { HOODED_GENESIS_MANIFEST, HOODED_PREVIEW_THRESHOLD, buildMetaplexMetadata, canonicalJson, evaluateSocietyAccess, metadataRevisionPayload, simulateProRataLaunch, validateLaunchManifest } from "@hooded/shared";
+
+function sealMetadata(manifest: typeof HOODED_GENESIS_MANIFEST) {
+  manifest.metadata.revision.contentHash = createHash("sha256").update(canonicalJson(metadataRevisionPayload(manifest.metadata))).digest("hex");
+}
 
 describe("LaunchManifestV1", () => {
   it("accepts a completed sealed HOODED mainnet canary manifest", () => {
@@ -7,8 +12,8 @@ describe("LaunchManifestV1", () => {
     manifest.metadata.creatorWallet = "0x1111111111111111111111111111111111111111";
     manifest.metadata.sourceCommit = "a".repeat(40);
     manifest.metadata.buildHash = "b".repeat(64);
-    manifest.metadata.revision.contentHash = "c".repeat(64);
     manifest.metadata.publication.image = "ipfs://bafybeigenuinehoodedicon";
+    sealMetadata(manifest);
     const result = validateLaunchManifest(manifest);
     expect(result.ready).toBe(true);
     expect(result.passed).toBe(13);
@@ -20,6 +25,16 @@ describe("LaunchManifestV1", () => {
     const result = validateLaunchManifest(manifest);
     expect(result.ready).toBe(false);
     expect(result.checks.filter((check) => !check.passed).map((check) => check.id)).toEqual(expect.arrayContaining(["metadata", "build"]));
+  });
+
+  it("canonicalizes metadata revisions independent of object insertion order", () => {
+    expect(canonicalJson({ z: 1, a: { y: 2, b: 3 } })).toBe('{"a":{"b":3,"y":2},"z":1}');
+    const manifest = structuredClone(HOODED_GENESIS_MANIFEST);
+    sealMetadata(manifest);
+    const firstHash = manifest.metadata.revision.contentHash;
+    manifest.metadata.publication.summary += " Updated.";
+    sealMetadata(manifest);
+    expect(manifest.metadata.revision.contentHash).not.toBe(firstHash);
   });
 
   it("blocks fee, authority, and allocation escapes", () => {

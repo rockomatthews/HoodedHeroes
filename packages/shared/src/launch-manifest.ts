@@ -109,6 +109,18 @@ export type LaunchManifestV1 = {
 
 export type ManifestCheck = { id: string; label: string; passed: boolean; detail: string };
 
+export function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+}
+
+export function metadataRevisionPayload(metadata: LaunchMetadataV1) {
+  const { contentHash: _contentHash, ...revision } = metadata.revision;
+  return { ...metadata, revision };
+}
+
 const CHAIN_QUOTES: Record<LaunchChain, readonly LaunchQuoteAsset[]> = {
   robinhood: ["ETH", "USDG", "HOODED"],
   base: ["ETH", "USDC"],

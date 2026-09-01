@@ -40,3 +40,5 @@ The current Slither review leaves explicit findings for intentional timestamp wi
 ## Metadata cost discipline
 
 The token stores only its fixed supply and one immutable `bytes32` manifest hash in addition to standard ERC-20 identity. Descriptions, artwork, social links, media dimensions, and distribution payloads remain in the signed content-addressed publication package. This keeps token creation gas bounded while preserving a verifiable link to complete metadata.
+
+Metadata revisions use recursively key-sorted canonical JSON. The revision SHA-256 excludes only its own `contentHash` field; Launch Bay recomputes and verifies that digest before persistence or unsigned transaction preparation. The complete manifest then receives its canonical database SHA-256 and on-chain Keccak-256 commitment, preventing publication edits from silently retaining old evidence.
