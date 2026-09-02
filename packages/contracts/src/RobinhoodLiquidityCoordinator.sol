@@ -140,6 +140,7 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
     function finalize() external nonReentrant returns (uint256 mintedPositionId) {
         require(!finalized && !retired, "closed");
         require(block.timestamp > sale.endsAt(), "sale open");
+        require(block.timestamp <= sale.claimDeadline(), "finalization expired");
         require(!sale.isRefunding() && sale.totalContributed() >= sale.minimumRaise(), "sale failed");
         require(sale.totalSettledContribution() == sale.totalContributed(), "unsettled contributions");
         finalized = true;

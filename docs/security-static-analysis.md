@@ -12,6 +12,7 @@ The v1.4 working tree was scanned on 2026-09-01 with Slither across 56 contracts
 - Low-level calls are limited to native pull payments and optional referral discovery. Native transfers check success; an unsupported referral registry is treated as unverified. Burns now use a typed interface and verify the exact total-supply decrease.
 - Fee harvesting and liquidity finalization are protected by `nonReentrant`; finalization closes before its first external call. The remaining benign reentrancy reports must still be reviewed against the final adapter.
 - The exact quote equality proves that only the amount withdrawn from the sale ledger reaches adapter finalization; pre-existing or forced balance is intentionally excluded. Expired quote redirection changes ledger ownership without transferring native currency and leaves `quoteLiability` unchanged.
+- The `claimDeadline` comparison intentionally partitions finalization (`<=`) from terminal retirement (`>`); no timestamp permits both paths. Adapter security declarations and hook data remain self-reported and require independent adapter review.
 - OpenZeppelin pragma variation comes from the pinned `5.4.0` dependency; HOODED contracts compile with exact Solidity `0.8.27`.
 
 ## Still required

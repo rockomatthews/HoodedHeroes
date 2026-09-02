@@ -222,6 +222,23 @@ contract CanonicalPoolDescriptorTest is Test {
         assertEq(sale.claimableQuote(sale.proceedsRecipient()), proceedsBefore + 37.5 ether);
     }
 
+    function testFinalizationAndTerminalRetirementWindowsNeverOverlap() public {
+        (RobinhoodLiquidityCoordinator coordinator, ProRataFairLaunch sale,,,) = _readyLaunch(0, 10);
+        uint256 snapshot = vm.snapshotState();
+
+        vm.warp(sale.claimDeadline());
+        vm.expectRevert(bytes("sale succeeded"));
+        coordinator.retireFailedLaunch();
+        assertEq(coordinator.finalize(), 1, "finalization should remain open at the deadline");
+
+        assertTrue(vm.revertToState(snapshot), "snapshot restore failed");
+        vm.warp(uint256(sale.claimDeadline()) + 1);
+        vm.expectRevert(bytes("finalization expired"));
+        coordinator.finalize();
+        coordinator.retireFailedLaunch();
+        assertTrue(coordinator.retired(), "terminal retirement did not open after the deadline");
+    }
+
     function _readyLaunch(uint8 adapterMode, uint256 nonce)
         private
         returns (

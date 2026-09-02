@@ -24,3 +24,13 @@ Local evidence:
 ## Required follow-up
 
 The auditor must retest these changes and the v1.4 canonical pool interface. The production Robinhood Uniswap v4 adapter is still absent and requires a separate implementation audit, callback/price-manipulation tests, runtime-code-hash readback, and mainnet-fork canary before any deployment.
+
+## v1.4 interface compatibility disclosure
+
+The v1.4 adapter return type and coordinator constructor are source-incompatible with the three earlier external PoC files. The auditor's adapted `*.v14.t.sol` copies changed only mock return types/security declarations, the new leading `manifestHash` constructor argument, and the matching CREATE2 encoding. No exploit assertion or sequence changed. External adapters, direct coordinator deployers, and test harnesses must update in lockstep.
+
+## H-6 follow-up
+
+The first terminal recovery candidate allowed healthy finalization and destructive retirement to overlap after `claimDeadline`. The current candidate closes `finalize()` after `claimDeadline`; terminal retirement opens only when `block.timestamp > claimDeadline`. Boundary tests prove retirement is unavailable while finalization remains open at the deadline, and finalization is unavailable once retirement opens.
+
+Adapter `securityConfiguration()` remains self-attestation, not proof of price protection or callback correctness. The descriptor `hook` remains adapter-reported and unconstrained by the coordinator. Both limitations, plus the web registry and indexer, require separate review before canonical pool data is treated as authoritative.

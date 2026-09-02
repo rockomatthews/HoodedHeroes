@@ -1,6 +1,6 @@
 # HOODED contracts
 
-Original HOODED sources are licensed under AGPL-3.0-or-later. The package includes the Launch Bay v1.4 owner-only lab path and full-configuration-bound Safe-approved production path. The auditor closed the initial Critical and High findings at `3a23535`; the v1.3 follow-up closed the three partial findings, while the v1.4 canonical-pool interface and eventual production adapter require independent review. It is not authorized for deployment.
+Original HOODED sources are licensed under AGPL-3.0-or-later. The package includes the Launch Bay v1.4.1 owner-only lab path and full-configuration-bound Safe-approved production path. The auditor closed the initial Critical and High findings at `3a23535`; the v1.3 follow-up closed the three partial findings, and the auditor closed H-5/M-5 at `e780025`. H-6, the v1.4 canonical-pool interface, registry, and eventual production adapter require independent review. It is not authorized for deployment.
 
 Unaudited implementation foundations:
 
@@ -11,6 +11,7 @@ Unaudited implementation foundations:
 - `RobinhoodLiquidityCoordinator` and `PermanentPositionReceiver`: price-matched liquidity with pinned adapter/manager code hashes and no rescue or withdrawal path.
 - `CanonicalPoolDescriptor`: indexer-safe pool identity committed to coordinator state and emitted after the permanent lock proves the returned position ID.
 - Accounted-quote finalization: forced or CREATE2-prefunded native balance cannot alter liquidity sizing. After the claim deadline, permissionless terminal retirement burns an unfinalized allocation and redirects its sale-ledger quote to the immutable DAO proceeds recipient.
+- Finalization and terminal retirement are mutually exclusive: finalization closes at `claimDeadline`, and terminal retirement opens strictly afterward.
 - `SeasonRewardVault`: immutable Merkle claims with no owner withdrawal path.
 
 The lab factory binds creation to one immutable wallet. The production factory requires a review-Safe signature for the creator, manifest, nonce, and deadline. Both commit the manifest hash, prevent replay, and create every sale sealed. Activation is a separate creator transaction.
@@ -19,4 +20,4 @@ The lab factory binds creation to one immutable wallet. The production factory r
 
 Before any deployment: complete role analysis, invariant coverage, mainnet-fork testing, independent audit, Safe/timelock wiring, bytecode verification, and a full unsigned simulation rehearsal. Stock Token claim contracts are intentionally not included in this unaudited vertical slice.
 
-The production Uniswap v4 adapter is not included. Adapter security-configuration readback is a fail-closed integration gate, not evidence that callback or price protections are correctly implemented.
+The production Uniswap v4 adapter is not included. Adapter security-configuration readback is self-attestation and a fail-closed integration gate, not evidence that callback or price protections are correctly implemented. The descriptor `hook` is adapter-reported and is not independently constrained by the coordinator; the final adapter review must establish its immutable hook policy before the event or registry is treated as authoritative.

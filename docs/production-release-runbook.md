@@ -69,13 +69,13 @@ Repeat HLAB1 evidence, then activate the thirty-minute owner-only sale with a fo
 5. At or above 0.25 ETH: burn unsold sale supply, use only the coordinator's accounted sale-ledger quote, mint a price-matched position to the ownerless receiver, burn unused liquidity tokens, and verify the NFT owner/code hashes. Forced native balance must remain excluded from sizing.
 6. Enable the 25,000-HOODED preview gate only after verified token and sale addresses are configured and live readback succeeds.
 
-Finalize before `claimDeadline`. Once that deadline passes, any caller may terminally retire an unfinalized coordinator: the liquidity allocation burns and its accrued quote moves within the sale pull-payment ledger to the immutable DAO proceeds recipient. This is an irreversible failure escape hatch, not an alternate launch path.
+Finalize no later than `claimDeadline`; the contract rejects later finalization. Once that deadline passes, any caller may terminally retire an unfinalized coordinator: the liquidity allocation burns and its accrued quote moves within the sale pull-payment ledger to the immutable DAO proceeds recipient. The windows are mutually exclusive. This is an irreversible failure escape hatch, not an alternate launch path.
 
 Eligibility permits begin at nonce 1. Signing a lower or newer permit does not revoke an older unused permit unless the signer first raises the contributor's on-chain floor with `invalidateEligibilityNonces`; use short deadlines and confirm the floor transaction before distributing a correction.
 
 Before public eligibility, obtain attributable confirmation from both Mancer and LI.FI for Robinhood Chain ID 4663 and the exact v4 venue configuration (PoolManager, PositionManager, fee, tick spacing, hook, wrapped native, and pool ID). Generic Uniswap or EVM support is insufficient. LI.FI testing must include destination-gas estimation/delivery and a fail-closed no-destination-gas case. Keep both registry readiness values `unverified` until those confirmations and bidirectional address tests are recorded.
 
-The independent adapter audit, callback-caller rejection tests, existing-pool price-mismatch tests, Permit2 allowance cleanup, mainnet-fork canary, runtime-code-hash readback, decoded unsigned simulation, and explicit finalization approval remain mandatory. Provider confirmation does not replace any adapter gate.
+The independent adapter audit, callback-caller rejection tests, existing-pool price-mismatch tests, Permit2 allowance cleanup, hook-policy verification, actual-liquidity readback, mainnet-fork canary, runtime-code-hash readback, decoded unsigned simulation, and explicit finalization approval remain mandatory. `securityConfiguration()` is adapter self-attestation rather than proof. Provider confirmation does not replace any adapter gate.
 
 ## Gate 6 — Genesis Heroes
 

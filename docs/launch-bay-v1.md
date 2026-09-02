@@ -14,7 +14,7 @@ Launch Bay v1.4 is a fixed-price, timed, pro-rata fair-launch integration candid
 - Production approvals and participant eligibility are EIP-712 signatures bound to chain, contract, wallet, manifest, nonce, allowance, and expiration. Claims and refunds never require eligibility approval.
 - Accepted quote is split during settlement. For HOODED, 37.5% enters the liquidity coordinator, the disclosed fee follows its immutable split, and the remainder accrues to the DAO timelock.
 - Liquidity finalization sizes exclusively from quote accrued to the coordinator in the sale ledger. Forced or pre-funded native balance is never included in price or token sizing.
-- A launch must have a future sale end when the factory creates it, so community vesting cannot begin in the past. If successful liquidity remains unfinalized after the claim deadline, anyone may burn the unused liquidity allocation and redirect its accrued quote inside the pull-payment ledger to the immutable DAO proceeds recipient.
+- A launch must have a future sale end when the factory creates it, so community vesting cannot begin in the past. Finalization is available through `claimDeadline` and closes afterward; only then may anyone burn an unfinalized liquidity allocation and redirect its accrued quote inside the pull-payment ledger to the immutable DAO proceeds recipient. The two paths never overlap.
 - Permissionless failed-launch refunds, oversubscription refunds, incident-pause-to-refund behavior, settlement on behalf of inactive contributors, immutable recipients, and no owner withdrawal. Quote proceeds, fees, and refunds use recipient-owned pull balances, so a recipient that rejects ETH cannot block anyone else's settlement. Unsold tokens cannot move until every contribution has settled.
 - Owner-only unsigned creation and activation preparation routes with exact factory/sale bytecode checks, immutable-owner readback, manifest-hash checks, gas estimation, and required mainnet `eth_call` simulation.
 - Launch preparation requires the manifest reward recipient, submitted execution recipient, and server-configured chain reward vault to match exactly. The reward vault can permissionlessly pull its accrued sale-fee balance into a new equal-per-Hero round; native fees are wrapped before accounting.
@@ -23,6 +23,8 @@ Launch Bay v1.4 is a fixed-price, timed, pro-rata fair-launch integration candid
 ## Deliberately disabled
 
 No deployment address is bundled. Lab and production prepare endpoints refuse to create unsigned transactions until their factories, reward vault, approval signer, liquidity adapter, position manager, manifests, and runtime hashes match. They never broadcast. Solana activation, Base production, Stock Token pairs, public sale activation, listing submissions, and paid promotion remain closed approval gates.
+
+The adapter's `securityConfiguration()` values and descriptor `hook` are adapter-reported. Coordinator checks require the declarations and validate the permanent position receipt, but do not independently prove price initialization, liquidity amounts, or hook policy. Those properties remain final-adapter audit and runtime-code-hash gates.
 
 ## HOODED genesis preset
 

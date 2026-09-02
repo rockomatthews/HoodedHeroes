@@ -18,7 +18,7 @@ export const LAUNCH_BAY_PROJECT = {
   slug: "launch-bay",
   name: "Launch Bay",
   codename: "FOUNDRY-01",
-  version: "1.4.0-canonical-pool-remediation",
+  version: "1.4.1-h6-remediation",
   license: "AGPL-3.0-or-later",
   repository: "GitHub App protected repository",
   branchPolicy: "pull-request-only",

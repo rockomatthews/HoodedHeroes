@@ -15,7 +15,7 @@ import {TokenVestingVault} from "./TokenVestingVault.sol";
 contract ProductionLaunchFactory is EIP712 {
     using SafeERC20 for FixedSupplyLaunchToken;
 
-    string public constant TEMPLATE_VERSION = "1.4.0";
+    string public constant TEMPLATE_VERSION = "1.4.1";
     uint64 public constant MIN_COMMUNITY_VESTING_DURATION = 730 days;
     uint256 public constant MIN_VESTED_SUPPLY_BPS = 500;
     uint256 public constant MAX_VESTED_SUPPLY_BPS = 1_000;

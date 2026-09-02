@@ -12,7 +12,7 @@ This folder is the project's contribution front door. Production code remains in
 
 ## Current milestone
 
-`v1.4.0-canonical-pool-remediation` retains the auditor-confirmed Critical and High remediations, the v1.3 M-1/M-2/L-1 follow-up, closes H-5/M-5, and adds canonical pool registry readback for Robinhood Chain. It is not approved or deployed: the remediation, v1.4 changes, and the still-unimplemented Uniswap v4 adapter require independent review. STARFOX is a future token intended to use Launch Bay, not the name of this integration. Base and Solana remain unavailable.
+`v1.4.1-h6-remediation` retains the auditor-confirmed Critical and High remediations, the v1.3 M-1/M-2/L-1 follow-up, closes H-5/M-5, partitions finalization from terminal retirement for H-6, and includes canonical pool registry readback for Robinhood Chain. It is not approved or deployed: the remediation, v1.4 interface, registry, and still-unimplemented Uniswap v4 adapter require independent review. STARFOX is a future token intended to use Launch Bay, not the name of this integration. Base and Solana remain unavailable.
 
 The two rehearsal identities are permanently reserved as `HOODED LAB 01 / HLAB1` and `HOODED LAB 02 / HLAB2`. Both are experimental, have no promised value, and create no public liquidity pool.
 
