@@ -1,6 +1,6 @@
 # HOODED contracts
 
-Original HOODED sources are licensed under AGPL-3.0-or-later. The package includes the Launch Bay v1.6.0 owner-only lab path, full-configuration-bound Safe-approved production path, and Robinhood Uniswap v4 liquidity adapter. The v1.5 audit closed H-6/N-3/N-4 and identified C-2/H-7; v1.6 contains their remediation and requires follow-up review. It is not authorized for deployment.
+Original HOODED sources are licensed under AGPL-3.0-or-later. The package includes the Launch Bay v1.7.0 owner-only lab path, full-configuration-bound Safe-approved production path, and factory-bound Robinhood Uniswap v4 liquidity adapter. The v1.6 audit closed C-2/L-6 but found H-7 remained through the adapter's public mint path; v1.7 binds that path to coordinators permanently attributed to one exact production factory and requires follow-up review. It is not authorized for deployment.
 
 Unaudited implementation foundations:
 

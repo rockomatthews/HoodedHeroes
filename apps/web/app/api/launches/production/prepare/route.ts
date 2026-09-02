@@ -69,6 +69,8 @@ const productionFactoryAbi = [{
 }, {
   type: "function", name: "approvalSigner", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
 }, {
+  type: "function", name: "liquidityDeployer", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
+}, {
   type: "function", name: "hashLaunchConfiguration", stateMutability: "pure",
   inputs: [
     { name: "tokenConfig", type: "tuple", components: tokenComponents },
@@ -78,6 +80,15 @@ const productionFactoryAbi = [{
     { name: "vestedAllocations", type: "tuple[]", components: [{ name: "beneficiary", type: "address" }, { name: "amount", type: "uint256" }, { name: "duration", type: "uint64" }] },
   ],
   outputs: [{ name: "", type: "bytes32" }],
+}] as const;
+const boundAdapterAbi = [{
+  type: "function", name: "authorizedFactory", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
+}, {
+  type: "function", name: "coordinatorDeployer", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
+}, {
+  type: "function", name: "poolManager", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
+}, {
+  type: "function", name: "positionManager", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }],
 }] as const;
 
 function exactAllocation(supply: bigint, bps: number) {
@@ -125,12 +136,18 @@ export async function POST(request: Request) {
       return Response.json({ error: "Canonical Robinhood Chain Uniswap v4 manager mismatch" }, { status: 422 });
     }
     const client = createPublicClient({ transport: http(rpcUrl) });
-    const [factoryCode, rewardCode, timelockCode, wethCode, adapterCode, poolManagerCode, managerCode, onchainApprovalSigner] = await Promise.all([
+    const adapterAddress = getAddress(execution.liquidityAdapter);
+    const [factoryCode, rewardCode, timelockCode, wethCode, adapterCode, poolManagerCode, managerCode, onchainApprovalSigner, factoryLiquidityDeployer, adapterFactory, adapterCoordinatorDeployer, adapterPoolManager, adapterPositionManager] = await Promise.all([
       client.getCode({ address: factory }), client.getCode({ address: rewardVault }),
       client.getCode({ address: timelock }),
-      client.getCode({ address: CANONICAL_RH_WETH }), client.getCode({ address: getAddress(execution.liquidityAdapter) }), client.getCode({ address: CANONICAL_RH_V4_POOL_MANAGER }),
+      client.getCode({ address: CANONICAL_RH_WETH }), client.getCode({ address: adapterAddress }), client.getCode({ address: CANONICAL_RH_V4_POOL_MANAGER }),
       client.getCode({ address: CANONICAL_RH_V4_POSITION_MANAGER }),
       client.readContract({ address: factory, abi: productionFactoryAbi, functionName: "approvalSigner" }),
+      client.readContract({ address: factory, abi: productionFactoryAbi, functionName: "liquidityDeployer" }),
+      client.readContract({ address: adapterAddress, abi: boundAdapterAbi, functionName: "authorizedFactory" }),
+      client.readContract({ address: adapterAddress, abi: boundAdapterAbi, functionName: "coordinatorDeployer" }),
+      client.readContract({ address: adapterAddress, abi: boundAdapterAbi, functionName: "poolManager" }),
+      client.readContract({ address: adapterAddress, abi: boundAdapterAbi, functionName: "positionManager" }),
     ]);
     if (!factoryCode || keccak256(factoryCode).toLowerCase() !== factoryHash) return Response.json({ error: "Production factory bytecode mismatch" }, { status: 409 });
     if (!rewardCode || keccak256(rewardCode).toLowerCase() !== rewardVaultHash) return Response.json({ error: "Reward vault bytecode mismatch" }, { status: 409 });
@@ -140,6 +157,11 @@ export async function POST(request: Request) {
     if (!poolManagerCode || keccak256(poolManagerCode).toLowerCase() !== execution.poolManagerCodeHash.toLowerCase()) return Response.json({ error: "Pool manager bytecode mismatch" }, { status: 409 });
     if (!managerCode || keccak256(managerCode).toLowerCase() !== execution.positionManagerCodeHash.toLowerCase()) return Response.json({ error: "Position manager bytecode mismatch" }, { status: 409 });
     if (getAddress(onchainApprovalSigner) !== getAddress(approvalSignerRaw)) return Response.json({ error: "Factory approval signer mismatch" }, { status: 409 });
+    if (getAddress(adapterFactory) !== factory) return Response.json({ error: "Liquidity adapter is not bound to the configured production factory" }, { status: 409 });
+    if (getAddress(adapterCoordinatorDeployer) !== getAddress(factoryLiquidityDeployer)) return Response.json({ error: "Liquidity adapter coordinator deployer binding mismatch" }, { status: 409 });
+    if (getAddress(adapterPoolManager) !== CANONICAL_RH_V4_POOL_MANAGER || getAddress(adapterPositionManager) !== CANONICAL_RH_V4_POSITION_MANAGER) {
+      return Response.json({ error: "Liquidity adapter manager readback mismatch" }, { status: 409 });
+    }
 
     const supply = BigInt(manifest.metadata.exactSupply);
     const manifestHash = keccak256(stringToHex(canonicalJson(manifest)));

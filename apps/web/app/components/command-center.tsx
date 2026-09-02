@@ -7,6 +7,7 @@ import { CodeBazaarWorkbench } from "./code-bazaar-workbench";
 import { CommunitySignal } from "./community-signal";
 import { HeroRewardLedger } from "./hero-reward-ledger";
 import { LaunchBayWorkbench } from "./launch-bay-workbench";
+import { AssemblyWorkbench, MissionDeckWorkbench, StockVaultWorkbench, WorkshopWorkbench } from "./district-workbenches";
 
 type RoomId =
   | "mission-deck"
@@ -44,37 +45,37 @@ const ROOMS: Record<RoomId, Room> = {
   "mission-deck": {
     id: "mission-deck", label: "Mission Deck", eyebrow: "OPERATIONS // LIVE BRIEFINGS", accent: "red",
     summary: "Choose deterministic city operations, spend energy, and submit replayable action traces for signed scoring.",
-    stats: [["Available", "06"], ["Energy", "82/100"], ["Daily bonus", "+15 REP"]],
+    stats: [["Playable", "01"], ["Reward scoring", "LOCKED"], ["Planned", "05"]],
     actions: ["Power Grid", "Drone Dash", "Cipher Break"],
   },
   "code-bazaar": {
     id: "code-bazaar", label: "Code Bazaar", eyebrow: "PRIVATE BUILDER LAB // ISOLATED", accent: "blue",
     summary: "A members-only workshop for proposing, testing, reviewing, and improving approved launcher modules without touching production systems.",
-    stats: [["Open modules", "12"], ["Tests today", "148"], ["Review queue", "04"]],
+    stats: [["Source", "GITHUB"], ["Execution", "SANDBOX"], ["Merge", "PR ONLY"]],
     actions: ["Launcher Core", "Vesting Module", "Liquidity Lock"],
   },
   assembly: {
     id: "assembly", label: "Assembly", eyebrow: "GOVERNANCE // SIX HOUSES", accent: "green",
-    summary: "Review proposals, debate changes, and cast hero-weighted votes after technical and security review.",
-    stats: [["Active votes", "03"], ["Quorum", "61%"], ["Next close", "18H"]],
+    summary: "Review proposals, debate changes, and record one-wallet/one-vote attestations after technical and security review.",
+    stats: [["Registry", "LIVE READ"], ["Voting", "HERO GATED"], ["Deploy rights", "NONE"]],
     actions: ["Proposal 018", "Security Council", "House Forum"],
   },
   "launch-bay": {
     id: "launch-bay", label: "Launch Bay", eyebrow: "AUDITED RELEASE PIPELINE", accent: "yellow",
     summary: "Move approved fixed-supply projects through reproducible builds, audit gates, contribution caps, vesting, and locked liquidity.",
-    stats: [["In review", "02"], ["Audited", "05"], ["Live", "00"]],
+    stats: [["RH adapter", "AUDIT HOLD"], ["Base", "BLOCKED"], ["Solana", "BLOCKED"]],
     actions: ["New proposal", "Audit trail", "Launch checklist"],
   },
   "stock-vault": {
     id: "stock-vault", label: "Stock Token Vault", eyebrow: "ELIGIBILITY-GATED REWARDS", accent: "purple",
     summary: "View funded Stock Token pools and jurisdiction-aware claim eligibility. Prohibited wallets receive no substitute award.",
-    stats: [["Assets", "06"], ["Claim window", "LOCKED"], ["Vault status", "FUNDED"]],
+    stats: [["Assets scoped", "06"], ["Claim window", "LOCKED"], ["Funding", "UNVERIFIED"]],
     actions: ["Eligibility", "Asset pools", "Claim history"],
   },
   workshop: {
     id: "workshop", label: "Hero Workshop", eyebrow: "CRAFT // EQUIP // UPGRADE", accent: "orange",
     summary: "Craft strategic equipment, configure abilities, and reinvest Salary Credits into earned progression.",
-    stats: [["Blueprints", "09"], ["Gear slots", "02"], ["Credits", "3,450"]],
+    stats: [["Abilities", "03"], ["Gear", "03"], ["Credit spend", "DISABLED"]],
     actions: ["Craft gear", "Ability loadout", "Blueprint archive"],
   },
   season: {
@@ -226,6 +227,14 @@ function RoomPanel({ room, onClose }: { room: Room; onClose: () => void }) {
         <CommunitySignal />
       ) : room.id === "launch-bay" ? (
         <LaunchBayWorkbench />
+      ) : room.id === "mission-deck" ? (
+        <MissionDeckWorkbench />
+      ) : room.id === "assembly" ? (
+        <AssemblyWorkbench />
+      ) : room.id === "stock-vault" ? (
+        <StockVaultWorkbench />
+      ) : room.id === "workshop" ? (
+        <WorkshopWorkbench />
       ) : room.id === "vault" ? (
         <HeroRewardLedger />
       ) : (

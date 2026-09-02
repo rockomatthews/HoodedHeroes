@@ -33,9 +33,34 @@ interface IPermanentPositionRegistrar {
     function registerPosition(uint256 tokenId) external;
 }
 
-/// @notice Auditable, no-hook Uniswap v4 liquidity adapter for Robinhood Chain.
+interface ICoordinatorProvenance {
+    function coordinatorFactory(address coordinator) external view returns (address);
+}
+
+interface IProductionFactoryReadback {
+    function liquidityDeployer() external view returns (address);
+}
+
+interface ILaunchCoordinatorReadback {
+    function adapter() external view returns (address);
+    function token() external view returns (address);
+    function positionLock() external view returns (address);
+    function sale() external view returns (address);
+}
+
+interface IPermanentPositionGuard {
+    function adapter() external view returns (address);
+    function positionManager() external view returns (address);
+    function locked() external view returns (bool);
+}
+
+interface ILaunchProceedsReadback {
+    function proceedsRecipient() external view returns (address);
+}
+
+/// @notice Auditable, factory-bound Uniswap v4 liquidity adapter for Robinhood Chain.
 /// @dev The immutable constructor configuration is embedded in the runtime bytecode pinned by the coordinator.
-///      This contract has no owner, callbacks, arbitrary-call surface, fee collection, or rescue function.
+///      This contract has no owner, unlock callback, arbitrary-call surface, fee collection, or rescue function.
 contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using PoolIdLibrary for PoolKey;
@@ -52,6 +77,9 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
     int24 public immutable tickSpacing;
     int24 public immutable tickLower;
     int24 public immutable tickUpper;
+    address public immutable coordinatorDeployer;
+    bytes32 public immutable coordinatorDeployerCodeHash;
+    address public immutable authorizedFactory;
 
     event V4PositionMinted(
         bytes32 indexed poolId,
@@ -71,11 +99,13 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
         address permit2_,
         address wrappedNative_,
         uint24 fee_,
-        int24 tickSpacing_
+        int24 tickSpacing_,
+        address coordinatorDeployer_,
+        address authorizedFactory_
     ) {
         require(
             poolManager_ != address(0) && positionManager_ != address(0) && permit2_ != address(0)
-                && wrappedNative_ != address(0),
+                && wrappedNative_ != address(0) && coordinatorDeployer_ != address(0) && authorizedFactory_ != address(0),
             "zero address"
         );
         require(fee_ > 0 && fee_ < 1_000_000, "invalid fee");
@@ -89,6 +119,14 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
         tickSpacing = tickSpacing_;
         tickLower = (TickMath.MIN_TICK / tickSpacing_) * tickSpacing_;
         tickUpper = (TickMath.MAX_TICK / tickSpacing_) * tickSpacing_;
+        coordinatorDeployer = coordinatorDeployer_;
+        coordinatorDeployerCodeHash = coordinatorDeployer_.codehash;
+        authorizedFactory = authorizedFactory_;
+        require(coordinatorDeployerCodeHash != bytes32(0), "missing coordinator deployer");
+        require(
+            IProductionFactoryReadback(authorizedFactory_).liquidityDeployer() == coordinatorDeployer_,
+            "factory deployer mismatch"
+        );
         require(address(positionManager.poolManager()) == poolManager_, "wrong pool manager");
         require(address(positionManager.permit2()) == permit2_, "wrong permit2");
     }
@@ -125,6 +163,27 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
         );
         require(tokenAmount > 0 && msg.value > 0, "zero liquidity");
         require(tokenAmount <= type(uint128).max && msg.value <= type(uint128).max, "amount overflow");
+
+        require(coordinatorDeployer.codehash == coordinatorDeployerCodeHash, "coordinator deployer changed");
+        require(
+            ICoordinatorProvenance(coordinatorDeployer).coordinatorFactory(msg.sender) == authorizedFactory,
+            "not an approved coordinator"
+        );
+        ILaunchCoordinatorReadback coordinator = ILaunchCoordinatorReadback(msg.sender);
+        require(coordinator.adapter() == address(this), "coordinator adapter mismatch");
+        require(coordinator.token() == token, "coordinator token mismatch");
+        require(coordinator.positionLock() == positionRecipient, "coordinator lock mismatch");
+        require(
+            ILaunchProceedsReadback(coordinator.sale()).proceedsRecipient() == refundRecipient,
+            "coordinator proceeds mismatch"
+        );
+        require(positionRecipient.code.length > 0, "invalid position receiver");
+        IPermanentPositionGuard positionGuard = IPermanentPositionGuard(positionRecipient);
+        require(
+            positionGuard.adapter() == address(this) && positionGuard.positionManager() == address(positionManager)
+                && !positionGuard.locked(),
+            "invalid position receiver"
+        );
 
         IERC20 launchToken = IERC20(token);
         launchToken.safeTransferFrom(msg.sender, address(this), tokenAmount);

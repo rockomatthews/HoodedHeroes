@@ -30,6 +30,7 @@ contract ProductionSaleDeployer {
 
 contract ProductionLiquidityDeployer {
     mapping(address coordinator => address factory) public coordinatorFactory;
+    mapping(address coordinator => address factory) public pendingCoordinatorFactory;
 
     function deploy(
         bytes32 manifestHash,
@@ -66,11 +67,12 @@ contract ProductionLiquidityDeployer {
             )
         );
         coordinatorFactory[coordinator] = msg.sender;
+        pendingCoordinatorFactory[coordinator] = msg.sender;
     }
 
     function bindSale(address coordinator, address sale) external {
-        require(coordinatorFactory[coordinator] == msg.sender, "not coordinator factory");
-        delete coordinatorFactory[coordinator];
+        require(pendingCoordinatorFactory[coordinator] == msg.sender, "not coordinator factory");
+        delete pendingCoordinatorFactory[coordinator];
         RobinhoodLiquidityCoordinator(payable(coordinator)).bindSale(sale);
     }
 }

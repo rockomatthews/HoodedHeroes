@@ -105,11 +105,39 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
   await expect(page.getByText("CANARY NOT CONFIGURED")).toBeVisible();
   await page.getByRole("button", { name: "Close My Vault" }).click();
 
+  await page.getByRole("button", { name: "Open Mission Deck" }).click();
+  await expect(page.getByRole("region", { name: "Mission Deck operations" })).toBeVisible();
+  await expect(page.getByText("NO REWARD CREDIT")).toBeVisible();
+  await page.getByRole("button", { name: "START GRID" }).click();
+  await expect(page.getByRole("grid", { name: "Power Grid practice board" })).toBeVisible();
+  await page.getByRole("button", { name: "Close Mission Deck" }).click();
+
+  await page.getByRole("button", { name: "Open Assembly" }).click();
+  await expect(page.getByRole("region", { name: "Assembly governance" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Reviewed evidence hash" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "ATTEST PEER APPROVAL" })).toBeDisabled();
+  await page.getByRole("button", { name: "Close Assembly" }).click();
+
+  await page.getByRole("button", { name: "Open Stock Token Vault" }).click();
+  await expect(page.getByRole("region", { name: "Stock Token Vault eligibility" })).toBeVisible();
+  await expect(page.getByText("UNVERIFIED", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "CHECK ELIGIBILITY" }).click();
+  await expect(page.getByText(/GENESIS-HERO-GATED SESSION IS REQUIRED/)).toBeVisible();
+  await page.getByRole("button", { name: "Close Stock Token Vault" }).click();
+
+  await page.getByRole("button", { name: "Open Hero Workshop" }).click();
+  await expect(page.getByRole("region", { name: "Hero Workshop loadout" })).toBeVisible();
+  await page.getByRole("button", { name: "CIPHER SIGHT" }).click();
+  await expect(page.getByText("CIPHER SIGHT", { exact: true })).toHaveCount(2);
+  await page.getByRole("button", { name: "SAVE LOADOUT" }).click();
+  await expect(page.getByText(/GENESIS-HERO-GATED SESSION IS REQUIRED/)).toBeVisible();
+  await page.getByRole("button", { name: "Close Hero Workshop" }).click();
+
   await page.getByRole("button", { name: "Open Code Bazaar" }).click();
   await expect(page.getByRole("dialog", { name: "Code Bazaar panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Code Bazaar" })).toBeVisible();
   await expect(page.getByText("FOUNDRY-01 // FIRST SOCIETY PROJECT")).toBeVisible();
-  await expect(page.getByText("v1.6.0-robinhood-v4-initialization-guard")).toBeVisible();
+  await expect(page.getByText("v1.7.0-factory-bound-v4-adapter")).toBeVisible();
   await page.getByRole("button", { name: "Hero Reward Rounds" }).click();
   await expect(page.getByText("packages/contracts/src/HeroRoundRewardVault.sol", { exact: true })).toBeVisible();
   await expect(page.getByText("○ REQUIRED // O(1) round funding")).toBeVisible();

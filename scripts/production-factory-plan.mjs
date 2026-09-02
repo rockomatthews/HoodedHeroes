@@ -69,7 +69,7 @@ const gasPrice = BigInt(gasPriceHex);
 const cost = gas * gasPrice;
 const predicted = run("cast", ["compute-address", "--nonce", nonce.toString(), deployer]).match(/0x[a-fA-F0-9]{40}/)?.[0];
 console.log(JSON.stringify({
-  schema: "hooded-production-factory-plan/v1.6", chainId: Number.parseInt(chainIdHex, 16), approvalSigner: signer,
+  schema: "hooded-production-factory-plan/v1.7", chainId: Number.parseInt(chainIdHex, 16), approvalSigner: signer,
   componentDeployers: componentReadbacks,
   deployer, nonce: nonce.toString(), predictedFactory: predicted, estimatedGas: gas.toString(), gasPriceWei: gasPrice.toString(),
   estimatedMaximumCostWei: cost.toString(), deployerBalanceWei: BigInt(balanceHex).toString(), funded: BigInt(balanceHex) >= cost,

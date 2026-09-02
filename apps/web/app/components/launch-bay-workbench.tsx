@@ -45,7 +45,8 @@ function manifestForChain(chain: LaunchChain, creatorWallet?: string): LaunchMan
 
 export function LaunchBayWorkbench() {
   const [manifest, setManifest] = useState(cloneGenesis);
-  const [submitted, setSubmitted] = useState(false);
+  const [submission, setSubmission] = useState<"idle" | "sending" | "sealed" | "rejected">("idle");
+  const [submissionDetail, setSubmissionDetail] = useState("");
   const [view, setView] = useState<"audit" | "metadata" | "simulation">("audit");
   const validation = useMemo(() => validateLaunchManifest(manifest), [manifest]);
   const simulation = useMemo(() => simulateProRataLaunch({
@@ -59,17 +60,17 @@ export function LaunchBayWorkbench() {
   }), []);
 
   function updateMetadata<Key extends keyof LaunchManifestV1["metadata"]>(key: Key, value: LaunchManifestV1["metadata"][Key]) {
-    setSubmitted(false);
+    setSubmission("idle");
     setManifest((current) => ({ ...current, metadata: { ...current.metadata, [key]: value } }));
   }
 
   function updatePublication<Key extends keyof LaunchManifestV1["metadata"]["publication"]>(key: Key, value: LaunchManifestV1["metadata"]["publication"][Key]) {
-    setSubmitted(false);
+    setSubmission("idle");
     setManifest((current) => ({ ...current, metadata: { ...current.metadata, publication: { ...current.metadata.publication, [key]: value } } }));
   }
 
   function selectChain(chain: LaunchChain) {
-    setSubmitted(false);
+    setSubmission("idle");
     setManifest((current) => manifestForChain(chain, current.metadata.creatorWallet));
   }
 
@@ -81,6 +82,25 @@ export function LaunchBayWorkbench() {
       : { tokenList: "Generated after deterministic contract address is prepared", dexScreener: "Profile package staged after deployment" };
   const dexPreview = manifest.metadata.tokenAddress ? buildDexScreenerProfile(manifest.metadata) : null;
   const isGenesis = manifest.metadata.projectId === "hooded-genesis";
+
+  async function queueReviewPackage() {
+    if (!validation.ready || submission === "sending") return;
+    setSubmission("sending");
+    setSubmissionDetail("SUBMITTING TO THE HERO-GATED REGISTRY…");
+    try {
+      const response = await fetch("/api/launches", {
+        method: "POST",
+        headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID().replaceAll("-", "") },
+        body: JSON.stringify(manifest),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      setSubmission(response.ok ? "sealed" : "rejected");
+      setSubmissionDetail(response.ok ? "PACKAGE RECORDED // NO TRANSACTION CREATED" : (payload.error?.toUpperCase() ?? "REGISTRY REJECTED PACKAGE"));
+    } catch {
+      setSubmission("rejected");
+      setSubmissionDetail("REGISTRY UNREACHABLE // NOTHING RECORDED");
+    }
+  }
 
   return (
     <div className="launch-builder launch-builder--v1">
@@ -108,7 +128,7 @@ export function LaunchBayWorkbench() {
           {view === "simulation" && <div className="simulation-preview"><b>OVERSUBSCRIBED // SAME PRICE</b>{simulation.wallets.map((wallet) => <div key={wallet.wallet}><span>{wallet.wallet}</span><strong>{wallet.tokenAllocation.toString()} TOKEN</strong><small>{wallet.refund.toString()} REFUND</small></div>)}</div>}
         </div>
       </div>
-      <div className="launch-pipeline launch-pipeline--v1"><span>DRAFT</span><i>→</i><span>LOCAL + FORK</span><i>→</i><span>SECURITY</span><i>→</i><span>MAINNET SIM</span><i>→</i><span>WALLET SIGN</span><button disabled={!validation.ready} onClick={() => setSubmitted(true)}>{submitted ? "✓ REVIEW PACKAGE SEALED" : validation.ready ? "QUEUE REVIEW PACKAGE" : `${validation.total - validation.passed} GATES BLOCKED`}</button></div>
+      <div className="launch-pipeline launch-pipeline--v1"><span>DRAFT</span><i>→</i><span>LOCAL + FORK</span><i>→</i><span>SECURITY</span><i>→</i><span>MAINNET SIM</span><i>→</i><span>WALLET SIGN</span><button disabled={!validation.ready || submission === "sending"} onClick={() => void queueReviewPackage()}>{submission === "sealed" ? "✓ REVIEW PACKAGE SEALED" : submission === "sending" ? "SUBMITTING…" : validation.ready ? "QUEUE REVIEW PACKAGE" : `${validation.total - validation.passed} GATES BLOCKED`}</button>{submissionDetail && <small>{submissionDetail}</small>}</div>
     </div>
   );
 }

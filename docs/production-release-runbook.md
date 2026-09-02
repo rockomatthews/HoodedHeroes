@@ -6,7 +6,7 @@ This runbook is intentionally noncustodial. Repository scripts calculate bytecod
 
 1. Confirm the founder recipient and three 2-of-3 Safe signers out of band.
 2. Deploy/configure the Safe and seven-day DAO timelock; publish owners, threshold, modules, and delay.
-3. Freeze the v1.4 manifest, media hashes, Git commit, compiler settings, factory-created community vesting configuration, reward vault, eligibility signer, and legal/risk disclosures.
+3. Freeze the v1.7 manifest, media hashes, Git commit, compiler settings, factory-created community vesting configuration, reward vault, eligibility signer, and legal/risk disclosures.
 4. Generate the 3,000-Hero collection with `node scripts/generate-hero-collection.mjs`. Replace image-CID placeholders only after the image directory is pinned; recalculate the collection root after the final metadata directory is pinned.
 5. Record the final Hero metadata root and base URI. Do not deploy a mutable placeholder collection.
 
@@ -51,13 +51,13 @@ Repeat HLAB1 evidence, then activate the thirty-minute owner-only sale with a fo
 
 ## Gate 4 — production factory and HOODED creation
 
-1. Preserve the original auditor's v1.3 remediation evidence, obtain review of the v1.4 contract/interface changes, then have two independent reviewers approve the final source and bytecode including the Uniswap v4 adapter.
-2. Deploy and verify the approval registry/Safe, reward vault, production factory, liquidity adapter, and position manager integration. The factory creates and funds the community vesting vault as part of launch creation.
+1. Preserve every prior remediation/PoC suite, obtain review of the v1.7 factory-provenance changes and Command Center APIs, then have two independent reviewers approve the final source and bytecode including the Uniswap v4 adapter.
+2. Deploy and verify the approval registry/Safe, reward vault, four component deployers, production factory, factory-bound liquidity adapter, and PositionManager integration. Deploy the factory before mining the adapter address. Read back that `adapter.authorizedFactory()` equals that exact factory and `adapter.coordinatorDeployer()` equals `factory.liquidityDeployer()`. The factory creates and funds the community vesting vault as part of launch creation.
 3. Configure only verified addresses and runtime hashes in `.env`/Vercel environment variables.
 4. Change `ENABLE_PRODUCTION_LAUNCH_PREPARE` only after the infrastructure readback passes.
 5. Obtain the Safe EIP-712 approval bound to creator, manifest hash, complete configuration hash, nonce, and deadline.
 6. Use `/api/launches/production/prepare` to simulate and generate the unsigned creation transaction.
-7. Obtain explicit transaction approval, sign in the creator wallet, and verify the sealed token/sale/coordinator/lock readback.
+7. Obtain explicit transaction approval, sign in the creator wallet, and verify the sealed token/sale/coordinator/lock readback plus permanent `coordinatorFactory(coordinator) == factory` provenance.
 8. Publish the complete evidence package for at least seven days before activation.
 
 ## Gate 5 — sale, settlement, and liquidity
@@ -75,7 +75,11 @@ Eligibility permits begin at nonce 1. Signing a lower or newer permit does not r
 
 Before public eligibility, obtain attributable confirmation from both Mancer and LI.FI for Robinhood Chain ID 4663 and the exact v4 venue configuration (PoolManager, PositionManager, fee, tick spacing, hook, wrapped native, and pool ID). Generic Uniswap or EVM support is insufficient. LI.FI testing must include destination-gas estimation/delivery and a fail-closed no-destination-gas case. Keep both registry readiness values `unverified` until those confirmations and bidirectional address tests are recorded.
 
-The independent adapter audit, callback-caller rejection tests, existing-pool price-mismatch tests, Permit2 allowance cleanup, hook-policy verification, actual-liquidity readback, mainnet-fork canary, runtime-code-hash readback, decoded unsigned simulation, and explicit finalization approval remain mandatory. `securityConfiguration()` is adapter self-attestation rather than proof. Provider confirmation does not replace any adapter gate.
+The independent adapter audit, unbound-token-holder/direct-allocation-holder rejection tests, cross-factory coordinator rejection, callback-caller rejection tests, existing-pool price-mismatch tests, Permit2 allowance cleanup, hook-policy verification, actual-liquidity readback, mainnet-fork canary, runtime-code-hash readback, decoded unsigned simulation, and explicit finalization approval remain mandatory. `securityConfiguration()` is adapter self-attestation rather than proof. Provider confirmation does not replace any adapter gate.
+
+## Gate 7 — Command Center operations
+
+Apply `docs/migrations/20260902_command_center_districts.sql`, then verify every row in `docs/command-center-release-matrix.md`. Power Grid practice must never award credit. Assembly must require a real reviewed evidence hash and a Hero-gated session. Stock Token Vault must remain claimless and must not say funded until current four-part eligibility plus a contract-backed funded pool are indexed. Workshop saves only loadout drafts and cannot spend Salary Credits. Code Bazaar, Launch Bay, and Community Signal must fail closed when GitHub, Sandbox, database, audit, or Hero gates are missing. Exercise every district on desktop and mobile before public access.
 
 ## Gate 6 — Genesis Heroes
 

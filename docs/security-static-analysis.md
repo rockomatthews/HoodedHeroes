@@ -1,10 +1,10 @@
 # Static-analysis disposition
 
-The v1.5 adapter audit closed H-6/N-3/N-4 but reported blocking C-2 and H-7. Launch Bay v1.6 consumes force-fed native value without pricing it and gates pool initialization through the adapter's mined `beforeInitialize` hook. These changes require follow-up audit. Static analysis is supporting evidence, not an audit, and no mainnet transaction may be signed against any candidate commit.
+The v1.6 remediation audit closed C-2/L-6 but showed H-7 remained reachable through the adapter's public mint entrypoint. Launch Bay v1.7 binds that entrypoint to coordinators permanently attributed to one exact production factory and independently matches the coordinator, token, lock, sale proceeds, adapter, and PositionManager. These changes require follow-up audit. Static analysis is supporting evidence, not an audit, and no mainnet transaction may be signed against any candidate commit.
 
 ## Slither review
 
-The v1.6 working tree was scanned on 2026-09-01 with Slither across 104 contracts and 102 detectors. It reported 49 heuristic results. The prior true-positive native-balance equality is gone; remaining strict-equality reports cover accounted conservation or balances the adapter actively transfers. The dispositions still require independent confirmation.
+The v1.7 working tree was scanned on 2026-09-02 with Slither across 109 contracts and 102 detectors. It reported 49 heuristic results. Slither did not report a new factory-provenance issue, but that is not proof the H-7 boundary is correct; the new cross-contract authentication and every prior disposition require independent review on the frozen commit. Semgrep is not installed on this workstation and remains a failed release gate until CI produces its report.
 
 - Native quote transfers use recipient-owned pull balances. A rejecting recipient can fail only its own withdrawal and cannot block settlement, claims, refunds, or other recipients.
 - Exact equality in both factories is an intentional conservation invariant: every fixed-supply token must leave the factory in the declared allocations and the factory balance must be zero.
@@ -21,5 +21,5 @@ The v1.6 working tree was scanned on 2026-09-01 with Slither across 104 contract
 ## Still required
 
 - Semgrep is not installed in the current workstation environment, so its required release scan is not represented as complete.
-- The Robinhood Uniswap v4 adapter has been audited but is not cleared; C-2/H-7 remediation and the new initialization callback require follow-up review. Pool initialization, Permit2 settlement and cleanup, tick math, price encoding, exact-liquidity verification, and the permanent position receipt require independent review before deployment.
+- The Robinhood Uniswap v4 adapter has been audited but is not cleared; the v1.7 H-7 provenance boundary requires follow-up review. Pool initialization, Permit2 settlement and cleanup, tick math, price encoding, exact-liquidity verification, component-deployer provenance, and the permanent position receipt require independent review before deployment.
 - The 2026-09-01 dependency audit reported no known vulnerabilities. Slither's 49 findings require auditor disposition. Semgrep, SBOM, reproducible bytecode evidence, two independent reviews, and an incident/refund drill remain release gates.

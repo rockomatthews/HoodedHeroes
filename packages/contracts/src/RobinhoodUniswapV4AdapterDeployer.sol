@@ -15,11 +15,13 @@ contract RobinhoodUniswapV4AdapterDeployer {
         address permit2,
         address wrappedNative,
         uint24 fee,
-        int24 tickSpacing
+        int24 tickSpacing,
+        address coordinatorDeployer,
+        address authorizedFactory
     ) external returns (address adapter) {
         adapter = address(
             new RobinhoodUniswapV4LiquidityAdapter{salt: salt}(
-                poolManager, positionManager, permit2, wrappedNative, fee, tickSpacing
+                poolManager, positionManager, permit2, wrappedNative, fee, tickSpacing, coordinatorDeployer, authorizedFactory
             )
         );
         emit AdapterDeployed(adapter, salt, adapter.codehash);

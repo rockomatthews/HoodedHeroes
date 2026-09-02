@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity 0.8.27;
+pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -13,12 +13,24 @@ import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol"
 import {FixedSupplyLaunchToken} from "../src/FixedSupplyLaunchToken.sol";
 import {PermanentPositionReceiver} from "../src/PermanentPositionReceiver.sol";
 import {ProRataFairLaunch} from "../src/ProRataFairLaunch.sol";
-import {CanonicalPoolDescriptor, RobinhoodLiquidityCoordinator} from "../src/RobinhoodLiquidityCoordinator.sol";
+import {RobinhoodLiquidityCoordinator} from "../src/RobinhoodLiquidityCoordinator.sol";
+import {ProductionLaunchFactory} from "../src/ProductionLaunchFactory.sol";
+import {
+    ProductionTokenDeployer,
+    ProductionSaleDeployer,
+    ProductionLiquidityDeployer,
+    ProductionVestingDeployer
+} from "../src/ProductionComponentDeployers.sol";
 import {RobinhoodUniswapV4LiquidityAdapter} from "../src/RobinhoodUniswapV4LiquidityAdapter.sol";
 import {RobinhoodUniswapV4AdapterDeployer} from "../src/RobinhoodUniswapV4AdapterDeployer.sol";
 
-/// @notice Opt-in integration against a local fork of the canonical Robinhood Chain v4 deployment.
-/// @dev This never broadcasts. Enable with RUN_MAINNET_FORK_TESTS=true and RH_RPC_URL in `.env`.
+contract ForkPositionSink {
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+}
+
+/// @notice Opt-in integration against the canonical Robinhood Chain v4 deployment. Never broadcasts.
 contract RobinhoodUniswapV4LiquidityAdapterForkTest is Test {
     using StateLibrary for IPoolManager;
 
@@ -26,179 +38,156 @@ contract RobinhoodUniswapV4LiquidityAdapterForkTest is Test {
     address private constant POOL_MANAGER = 0x8366a39CC670B4001A1121B8F6A443A643e40951;
     address private constant POSITION_MANAGER = 0x58daec3116aae6D93017bAAea7749052E8a04fA7;
     address private constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+    uint256 private constant APPROVER_KEY = 0xA770;
+    address private constant CREATOR = address(0xC0FFEE);
+    address private constant ATTACKER = address(0xBAD1);
     uint24 private constant FEE = 3_000;
     int24 private constant TICK_SPACING = 60;
 
-    receive() external payable {}
+    ProductionLiquidityDeployer private liquidityDeployer;
+    ProductionLaunchFactory private factory;
+    RobinhoodUniswapV4LiquidityAdapter private adapter;
 
-    function testRobinhoodV4MintPriceLockAndAllowanceCleanupWhenEnabled() public {
-        if (!_selectRobinhoodFork()) return;
+    function testCanonicalBindingsAndFactoryProvenanceWhenEnabled() public {
+        if (!_setUpForkCandidate()) return;
+        assertEq(address(adapter.poolManager()), POOL_MANAGER);
+        assertEq(address(adapter.positionManager()), POSITION_MANAGER);
+        assertEq(address(adapter.permit2()), PERMIT2);
+        assertEq(address(adapter.wrappedNative()), WETH);
+        assertEq(adapter.coordinatorDeployer(), address(liquidityDeployer));
+        assertEq(adapter.authorizedFactory(), address(factory));
+        assertEq(adapter.coordinatorDeployerCodeHash(), address(liquidityDeployer).codehash);
+    }
 
-        RobinhoodUniswapV4LiquidityAdapter adapter = _deployAdapter();
-        PermanentPositionReceiver lock = new PermanentPositionReceiver(POSITION_MANAGER, address(adapter));
-        FixedSupplyLaunchToken token = new FixedSupplyLaunchToken(
-            "HOODED Adapter Fork", "HAF", 1_000_000_000 ether, address(this), keccak256("hooded-adapter-fork")
-        );
-        uint256 tokenAmount = 150_000_000 ether;
-        uint256 nativeAmount = 3.75 ether;
-        token.approve(address(adapter), tokenAmount);
-        vm.deal(address(this), 10 ether);
+    function testUnboundHolderCannotInitializeButFactoryCoordinatorFinalizesWhenEnabled() public {
+        if (!_setUpForkCandidate()) return;
+        (FixedSupplyLaunchToken token, ProRataFairLaunch sale, RobinhoodLiquidityCoordinator coordinator) =
+            _launch(keccak256("fork-h7"), 1);
+        vm.prank(CREATOR);
+        sale.activate();
+        vm.deal(ATTACKER, 101 ether);
+        vm.warp(sale.startsAt());
+        vm.prank(ATTACKER);
+        sale.contribute{value: 100 ether}(address(0));
+        vm.warp(uint256(sale.endsAt()) + 1);
+        sale.settleFor(ATTACKER);
 
-        CanonicalPoolDescriptor memory descriptor = adapter.mintPermanentPosition{value: nativeAmount}(
-            address(token), WETH, tokenAmount, address(lock), address(this)
-        );
+        uint256 attackerTokens = token.balanceOf(ATTACKER);
+        vm.startPrank(ATTACKER);
+        ForkPositionSink sink = new ForkPositionSink();
+        token.approve(address(adapter), attackerTokens);
+        vm.expectRevert(bytes("not an approved coordinator"));
+        adapter.mintPermanentPosition{value: 1 ether}(address(token), WETH, attackerTokens, address(sink), ATTACKER);
+        vm.stopPrank();
 
-        assertEq(descriptor.token, address(token));
-        assertEq(descriptor.quoteToken, WETH);
-        assertEq(descriptor.venueId, adapter.VENUE_ID());
-        assertEq(descriptor.fee, FEE);
-        assertEq(descriptor.tickSpacing, TICK_SPACING);
-        assertEq(descriptor.hook, address(adapter));
-        assertEq(descriptor.positionLock, address(lock));
-        assertTrue(lock.locked());
-        assertEq(lock.positionId(), descriptor.positionId);
-        assertEq(IERC721(POSITION_MANAGER).ownerOf(descriptor.positionId), address(lock));
-        assertGt(adapter.positionManager().getPositionLiquidity(descriptor.positionId), 0);
-
-        (uint160 actualSqrtPriceX96,,,) = IPoolManager(POOL_MANAGER).getSlot0(PoolId.wrap(descriptor.poolId));
-        assertEq(actualSqrtPriceX96, adapter.targetSqrtPriceX96(address(token), tokenAmount, nativeAmount));
+        uint256 positionId = coordinator.finalize();
+        assertEq(liquidityDeployer.coordinatorFactory(address(coordinator)), address(factory));
+        assertEq(IERC721(POSITION_MANAGER).ownerOf(positionId), coordinator.positionLock());
+        assertTrue(PermanentPositionReceiver(coordinator.positionLock()).locked());
+        assertGt(coordinator.canonicalLiquidity(), 0);
+        (,,, bytes32 poolId,,,,,) = coordinator.canonicalPool();
+        (uint160 price,,,) = IPoolManager(POOL_MANAGER).getSlot0(PoolId.wrap(poolId));
+        assertEq(price, coordinator.canonicalSqrtPriceX96());
         assertEq(token.balanceOf(address(adapter)), 0);
         assertEq(IERC20(WETH).balanceOf(address(adapter)), 0);
         assertEq(address(adapter).balance, 0);
-        (uint160 tokenPermit2Allowance,,) =
-            IAllowanceTransfer(PERMIT2).allowance(address(adapter), address(token), POSITION_MANAGER);
-        (uint160 wethPermit2Allowance,,) =
-            IAllowanceTransfer(PERMIT2).allowance(address(adapter), WETH, POSITION_MANAGER);
-        assertEq(tokenPermit2Allowance, 0);
-        assertEq(wethPermit2Allowance, 0);
-        assertEq(token.allowance(address(adapter), PERMIT2), 0);
-        assertEq(IERC20(WETH).allowance(address(adapter), PERMIT2), 0);
-
-        token.approve(address(adapter), tokenAmount);
-        vm.expectRevert(bytes("existing pool price mismatch"));
-        adapter.mintPermanentPosition{value: 3 ether}(address(token), WETH, tokenAmount, address(lock), address(this));
-
-        (bool callbackSucceeded,) = address(adapter).call(abi.encodeWithSignature("unlockCallback(bytes)", bytes("")));
-        assertFalse(callbackSucceeded, "adapter unexpectedly exposes a callback");
     }
 
     function testConstructorRejectsWrongCanonicalBindingsWhenEnabled() public {
         if (!_selectRobinhoodFork()) return;
-        RobinhoodUniswapV4AdapterDeployer adapterDeployer = new RobinhoodUniswapV4AdapterDeployer();
+        _deployFactory();
+        RobinhoodUniswapV4AdapterDeployer deployer = new RobinhoodUniswapV4AdapterDeployer();
         vm.expectRevert(bytes("wrong pool manager"));
-        _deployAdapterThrough(adapterDeployer, address(0x1111), POSITION_MANAGER, PERMIT2, WETH);
+        _mineAndDeploy(deployer, address(0x1111), POSITION_MANAGER, PERMIT2, WETH);
         vm.expectRevert(bytes("wrong permit2"));
-        _deployAdapterThrough(adapterDeployer, POOL_MANAGER, POSITION_MANAGER, address(0x2222), WETH);
+        _mineAndDeploy(deployer, POOL_MANAGER, POSITION_MANAGER, address(0x2222), WETH);
     }
 
-    function testRobinhoodSaleToCanonicalPoolEndToEndWhenEnabled() public {
-        if (!_selectRobinhoodFork()) return;
+    function _setUpForkCandidate() private returns (bool) {
+        if (!_selectRobinhoodFork()) return false;
+        _deployFactory();
+        adapter = _mineAndDeploy(new RobinhoodUniswapV4AdapterDeployer(), POOL_MANAGER, POSITION_MANAGER, PERMIT2, WETH);
+        return true;
+    }
 
-        RobinhoodUniswapV4LiquidityAdapter adapter = _deployAdapter();
-        PermanentPositionReceiver lock = new PermanentPositionReceiver(POSITION_MANAGER, address(adapter));
-        bytes32 manifestHash = keccak256("hooded-sale-to-v4-fork");
-        FixedSupplyLaunchToken token = new FixedSupplyLaunchToken(
-            "HOODED End-to-End Fork", "HE2E", 1_000_000_000 ether, address(this), manifestHash
+    function _deployFactory() private {
+        liquidityDeployer = new ProductionLiquidityDeployer();
+        factory = new ProductionLaunchFactory(
+            vm.addr(APPROVER_KEY),
+            address(new ProductionTokenDeployer()),
+            address(new ProductionSaleDeployer()),
+            address(liquidityDeployer),
+            address(new ProductionVestingDeployer())
         );
-        RobinhoodLiquidityCoordinator coordinator = new RobinhoodLiquidityCoordinator(
-            manifestHash,
-            address(token),
-            WETH,
-            WETH.codehash,
-            address(adapter),
-            address(adapter).codehash,
-            POOL_MANAGER,
-            POOL_MANAGER.codehash,
-            POSITION_MANAGER,
-            POSITION_MANAGER.codehash,
-            address(lock)
+    }
+
+    function _mineAndDeploy(RobinhoodUniswapV4AdapterDeployer deployer, address manager, address positions, address permit, address weth)
+        private returns (RobinhoodUniswapV4LiquidityAdapter deployed)
+    {
+        bytes memory args = abi.encode(
+            manager, positions, permit, weth, FEE, TICK_SPACING, address(liquidityDeployer), address(factory)
         );
-        ProRataFairLaunch.Config memory config = ProRataFairLaunch.Config({
-            saleToken: address(token),
-            quoteToken: address(0),
-            saleAllocation: 400_000_000 ether,
-            pricePerToken: 0.000000025 ether,
-            minimumRaise: 0.25 ether,
-            maximumRaise: 10 ether,
-            walletCap: 10 ether,
-            startsAt: uint64(block.timestamp + 10),
-            endsAt: uint64(block.timestamp + 100),
-            claimDeadline: uint64(block.timestamp + 30 days),
-            saleFeeBps: 75,
-            creator: address(this),
-            securityCouncil: address(0xC0),
-            proceedsRecipient: address(this),
-            liquidityRecipient: address(coordinator),
-            operationsRecipient: address(0xD2),
-            rewardsRecipient: address(0xD3),
-            referralRegistry: address(0),
-            unsoldRecipient: address(0xD4),
-            eligibilitySigner: address(0),
-            liquidityShareBps: 3_750,
-            burnUnsold: true
+        (, bytes32 salt) = HookMiner.find(
+            address(deployer), Hooks.BEFORE_INITIALIZE_FLAG, type(RobinhoodUniswapV4LiquidityAdapter).creationCode, args
+        );
+        deployed = RobinhoodUniswapV4LiquidityAdapter(payable(deployer.deploy(
+            salt, manager, positions, permit, weth, FEE, TICK_SPACING, address(liquidityDeployer), address(factory)
+        )));
+    }
+
+    function _launch(bytes32 manifestHash, uint256 nonce)
+        private returns (FixedSupplyLaunchToken token, ProRataFairLaunch sale, RobinhoodLiquidityCoordinator coordinator)
+    {
+        ProductionLaunchFactory.TokenConfig memory tokenConfig =
+            ProductionLaunchFactory.TokenConfig("Fork Launch", "FORK", 1_000 ether, manifestHash);
+        ProRataFairLaunch.Config memory saleConfig = ProRataFairLaunch.Config({
+            saleToken: address(0), quoteToken: address(0), saleAllocation: 400 ether, pricePerToken: 0.25 ether,
+            minimumRaise: 1 ether, maximumRaise: 100 ether, walletCap: 100 ether,
+            startsAt: uint64(block.timestamp + 100), endsAt: uint64(block.timestamp + 200),
+            claimDeadline: uint64(block.timestamp + 400), saleFeeBps: 0, creator: address(0),
+            securityCouncil: address(0xC0), proceedsRecipient: address(0xD1), liquidityRecipient: address(0),
+            operationsRecipient: address(0xD2), rewardsRecipient: address(0xD3), referralRegistry: address(0),
+            unsoldRecipient: address(0), eligibilitySigner: address(0), liquidityShareBps: 3_750, burnUnsold: true
         });
-        ProRataFairLaunch sale = new ProRataFairLaunch(config);
-        coordinator.bindSale(address(sale));
-        token.transfer(address(sale), 400_000_000 ether);
-        token.transfer(address(coordinator), 150_000_000 ether);
-        sale.activate();
+        ProductionLaunchFactory.LiquidityConfig memory liquidity = ProductionLaunchFactory.LiquidityConfig({
+            tokenAllocation: 150 ether, wrappedNative: WETH, wrappedNativeCodeHash: WETH.codehash,
+            adapter: address(adapter), adapterCodeHash: address(adapter).codehash,
+            poolManager: POOL_MANAGER, poolManagerCodeHash: POOL_MANAGER.codehash,
+            positionManager: POSITION_MANAGER, positionManagerCodeHash: POSITION_MANAGER.codehash
+        });
+        ProductionLaunchFactory.Allocation[] memory direct = new ProductionLaunchFactory.Allocation[](1);
+        direct[0] = ProductionLaunchFactory.Allocation(address(0xD5), 400 ether);
+        ProductionLaunchFactory.VestedAllocation[] memory vested = new ProductionLaunchFactory.VestedAllocation[](1);
+        vested[0] = ProductionLaunchFactory.VestedAllocation(address(0xDA0), 50 ether, 730 days);
+        bytes32 configHash = factory.hashLaunchConfiguration(tokenConfig, saleConfig, liquidity, direct, vested);
+        bytes memory signature = _approval(manifestHash, configHash, nonce);
+        vm.prank(CREATOR);
+        (address tokenAddress, address saleAddress) = factory.createApprovedLaunch(
+            tokenConfig, saleConfig, liquidity, direct, vested, nonce, type(uint64).max, signature
+        );
+        token = FixedSupplyLaunchToken(tokenAddress);
+        sale = ProRataFairLaunch(payable(saleAddress));
+        coordinator = RobinhoodLiquidityCoordinator(payable(sale.liquidityRecipient()));
+    }
 
-        vm.deal(address(this), 11 ether);
-        vm.warp(config.startsAt);
-        sale.contribute{value: 10 ether}(address(0));
-        vm.warp(uint256(config.endsAt) + 1);
-        sale.settleFor(address(this));
-        uint256 positionId = coordinator.finalize();
-
-        assertTrue(coordinator.finalized());
-        assertEq(coordinator.positionId(), positionId);
-        assertEq(IERC721(POSITION_MANAGER).ownerOf(positionId), address(lock));
-        assertGt(coordinator.canonicalLiquidity(), 0);
-        (,,, bytes32 poolId,,,,,) = coordinator.canonicalPool();
-        (uint160 poolPrice,,,) = IPoolManager(POOL_MANAGER).getSlot0(PoolId.wrap(poolId));
-        assertEq(poolPrice, coordinator.canonicalSqrtPriceX96());
-        assertEq(token.balanceOf(address(adapter)), 0);
-        assertEq(IERC20(WETH).balanceOf(address(adapter)), 0);
-        assertEq(address(adapter).balance, 0);
+    function _approval(bytes32 manifestHash, bytes32 configHash, uint256 nonce) private view returns (bytes memory) {
+        bytes32 domain = keccak256(abi.encode(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes("HOODED Launch Approval")), keccak256(bytes("1")), block.chainid, address(factory)
+        ));
+        bytes32 structHash = keccak256(abi.encode(
+            factory.APPROVAL_TYPEHASH(), CREATOR, manifestHash, configHash, nonce, uint256(type(uint64).max)
+        ));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(APPROVER_KEY, keccak256(abi.encodePacked("\x19\x01", domain, structHash)));
+        return abi.encodePacked(r, s, v);
     }
 
     function _selectRobinhoodFork() private returns (bool) {
-        if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) {
-            vm.skip(true);
-            return false;
-        }
+        if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) { vm.skip(true); return false; }
         string memory rpc = vm.envOr("RH_RPC_URL", string(""));
         require(bytes(rpc).length > 0, "RH_RPC_URL required");
         vm.createSelectFork(rpc);
         assertEq(block.chainid, 4_663, "wrong fork chain");
         return true;
-    }
-
-    function _deployAdapter() private returns (RobinhoodUniswapV4LiquidityAdapter) {
-        return _deployAdapterWithBindings(POOL_MANAGER, POSITION_MANAGER, PERMIT2, WETH);
-    }
-
-    function _deployAdapterWithBindings(address manager, address positions, address permit, address weth)
-        private
-        returns (RobinhoodUniswapV4LiquidityAdapter deployed)
-    {
-        RobinhoodUniswapV4AdapterDeployer adapterDeployer = new RobinhoodUniswapV4AdapterDeployer();
-        return _deployAdapterThrough(adapterDeployer, manager, positions, permit, weth);
-    }
-
-    function _deployAdapterThrough(
-        RobinhoodUniswapV4AdapterDeployer adapterDeployer,
-        address manager,
-        address positions,
-        address permit,
-        address weth
-    ) private returns (RobinhoodUniswapV4LiquidityAdapter deployed) {
-        bytes memory args = abi.encode(manager, positions, permit, weth, FEE, TICK_SPACING);
-        (, bytes32 salt) = HookMiner.find(
-            address(adapterDeployer), Hooks.BEFORE_INITIALIZE_FLAG, type(RobinhoodUniswapV4LiquidityAdapter).creationCode, args
-        );
-        deployed = RobinhoodUniswapV4LiquidityAdapter(
-            payable(adapterDeployer.deploy(salt, manager, positions, permit, weth, FEE, TICK_SPACING))
-        );
     }
 }

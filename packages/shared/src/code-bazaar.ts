@@ -18,7 +18,7 @@ export const LAUNCH_BAY_PROJECT = {
   slug: "launch-bay",
   name: "Launch Bay",
   codename: "FOUNDRY-01",
-  version: "1.6.0-robinhood-v4-initialization-guard",
+  version: "1.7.0-factory-bound-v4-adapter",
   license: "AGPL-3.0-or-later",
   repository: "GitHub App protected repository",
   branchPolicy: "pull-request-only",

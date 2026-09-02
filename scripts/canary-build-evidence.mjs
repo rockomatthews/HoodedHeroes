@@ -25,7 +25,23 @@ if (build.status !== 0) {
   process.exit(build.status ?? 1);
 }
 
-const names = ["LaunchFactory", "FixedSupplyLaunchToken", "ProRataFairLaunch", "TokenVestingVault", "PermanentPositionLock", "HeroRoundRewardVault"];
+const names = [
+  "LaunchFactory",
+  "ProductionLaunchFactory",
+  "ProductionTokenDeployer",
+  "ProductionSaleDeployer",
+  "ProductionLiquidityDeployer",
+  "ProductionVestingDeployer",
+  "FixedSupplyLaunchToken",
+  "ProRataFairLaunch",
+  "RobinhoodLiquidityCoordinator",
+  "PermanentPositionReceiver",
+  "RobinhoodUniswapV4LiquidityAdapter",
+  "RobinhoodUniswapV4AdapterDeployer",
+  "TokenVestingVault",
+  "HeroRoundRewardVault",
+  "HoodedGenesis",
+];
 const components = Object.fromEntries(names.map((name) => {
   const abi = run("forge", ["inspect", name, "abi", "--json"]);
   const bytecode = run("forge", ["inspect", name, "bytecode"]);
@@ -45,8 +61,8 @@ const evidence = {
   schema: "hooded-canary-build-evidence/v1",
   sourceCommit: git.status === 0 ? git.stdout.trim() : null,
   worktreeClean: status.status === 0 && status.stdout.trim().length === 0,
-  compiler: { solc: "0.8.27", optimizer: true, optimizerRuns: 200 },
-  factoryVersion: "1.0.0-mainnet-canary",
+  compiler: { solc: "auto-detect exact source pragmas", optimizer: true, optimizerRuns: 200 },
+  factoryVersion: "1.7.0",
   components,
 };
 const canonical = JSON.stringify(evidence);

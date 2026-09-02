@@ -24,7 +24,7 @@ Launch Bay v1.4 is a fixed-price, timed, pro-rata fair-launch integration candid
 
 No deployment address is bundled. Lab and production prepare endpoints refuse to create unsigned transactions until their factories, reward vault, approval signer, liquidity adapter, position manager, manifests, and runtime hashes match. They never broadcast. Solana activation, Base production, Stock Token pairs, public sale activation, listing submissions, and paid promotion remain closed approval gates.
 
-The adapter's `securityConfiguration()` values and descriptor `hook` are adapter-reported. Coordinator checks require the declarations and validate the permanent position receipt, but do not independently prove price initialization, liquidity amounts, or hook policy. Those properties remain final-adapter audit and runtime-code-hash gates.
+The coordinator independently reads the pool, price, range, liquidity, NFT owner, and permanent receiver after minting. The v1.7 adapter additionally authenticates permanent production-factory provenance before it moves assets. These mechanisms still require independent source/bytecode review, local real-v4 tests, and a fresh mainnet-fork canary before release.
 
 ## HOODED genesis preset
 
@@ -48,7 +48,7 @@ Run `pnpm canary:evidence` to rebuild the Solidity suite and print a reproducibl
 
 The current Slither review leaves explicit findings for intentional timestamp windows, the caller-only native-asset withdrawal, exact fixed-supply allocation conservation, low-level referral-registry detection, OpenZeppelin pragma variation, the constructor-bound wrapped-native deposit, and conservative reentrancy heuristics around guarded fee harvesting. The pull-payment design has a hostile-recipient regression test; the harvester requires the immutable recipient, matching quote asset, exact accrued/withdrawn amount, post-transfer balance reconciliation, and a reentrancy guard. These findings require independent auditor review before a mainnet signature; static analysis is not an audit.
 
-The v1.6 Robinhood Uniswap v4 adapter uses a full-range position and a CREATE2-mined address enabling only `beforeInitialize`. Its constructor enforces that flag, and the callback permits initialization solely through the pinned PoolManager when the adapter is the original sender. Forced native donations are wrapped and refunded without entering launch-price math. The coordinator independently verifies the hook identity, pool ID, exact price, range, liquidity, NFT ownership, and permanent receiver. Follow-up audit, frozen bytecode, runtime-hash readback, and the approved fork canary remain release gates.
+The v1.7 Robinhood Uniswap v4 adapter uses a full-range position and a CREATE2-mined address enabling only `beforeInitialize`. Its constructor binds one exact production factory and liquidity component deployer. Minting rejects any caller without permanent factory provenance and validates the coordinator token, adapter, receiver, PositionManager, sale, and proceeds recipient before transfers. Forced native donations are wrapped and refunded without entering launch-price math. The coordinator independently verifies the hook identity, pool ID, exact price, range, liquidity, NFT ownership, and permanent receiver. Follow-up audit, frozen bytecode, runtime-hash readback, and the approved fork canary remain release gates.
 
 ## Metadata cost discipline
 
