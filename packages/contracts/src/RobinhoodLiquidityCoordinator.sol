@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity 0.8.27;
+pragma solidity ^0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -64,6 +64,7 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
     using PositionInfoLibrary for PositionInfo;
+
 
     ProRataFairLaunch public sale;
     address public immutable binder;
@@ -176,7 +177,7 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
             "code hash changed"
         );
         AdapterSecurityConfiguration memory security = adapter.securityConfiguration();
-        require(security.callbackAuthority == address(0), "unexpected callback surface");
+        require(security.callbackAuthority == poolManager, "unexpected callback authority");
         require(security.enforcesInitialPrice && security.rejectsExistingPoolPriceMismatch, "price protection disabled");
         token.forceApprove(address(adapter), tokenAmount);
         CanonicalPoolDescriptor memory descriptor = adapter.mintPermanentPosition{value: nativeAmount}(
@@ -236,7 +237,7 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
         require(descriptor.token == address(token) && descriptor.quoteToken == wrappedNative, "pool asset mismatch");
         require(descriptor.venueId != bytes32(0) && descriptor.poolId != bytes32(0), "missing pool identity");
         require(descriptor.fee > 0 && descriptor.tickSpacing > 0, "invalid pool parameters");
-        require(descriptor.hook == address(0), "hook not allowed");
+        require(descriptor.hook == address(adapter), "unexpected initialization hook");
         require(descriptor.positionId > 0 && descriptor.positionLock == positionLock, "position mismatch");
         IPermanentPositionReadback lock = IPermanentPositionReadback(positionLock);
         require(lock.locked() && lock.positionId() == descriptor.positionId, "position not locked");
@@ -247,7 +248,7 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
             currency1: Currency.wrap(tokenIsCurrency0 ? wrappedNative : address(token)),
             fee: descriptor.fee,
             tickSpacing: descriptor.tickSpacing,
-            hooks: IHooks(address(0))
+            hooks: IHooks(address(adapter))
         });
         PoolId id = key.toId();
         require(PoolId.unwrap(id) == descriptor.poolId, "pool id mismatch");

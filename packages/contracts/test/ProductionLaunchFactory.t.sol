@@ -99,7 +99,7 @@ contract MockRobinhoodAdapter is IRobinhoodLiquidityAdapter {
             currency1: Currency.wrap(tokenIsCurrency0 ? wrappedNative : token),
             fee: 3_000,
             tickSpacing: 60,
-            hooks: IHooks(address(0))
+            hooks: IHooks(address(this))
         });
         uint256 amount0 = tokenIsCurrency0 ? tokenAmount : msg.value;
         uint256 amount1 = tokenIsCurrency0 ? msg.value : tokenAmount;
@@ -118,15 +118,15 @@ contract MockRobinhoodAdapter is IRobinhoodLiquidityAdapter {
             poolId: PoolId.unwrap(key.toId()),
             fee: 3_000,
             tickSpacing: 60,
-            hook: address(0),
+            hook: address(this),
             positionId: positionId,
             positionLock: recipient
         });
     }
 
-    function securityConfiguration() external pure returns (AdapterSecurityConfiguration memory configuration) {
+    function securityConfiguration() external view returns (AdapterSecurityConfiguration memory configuration) {
         configuration = AdapterSecurityConfiguration({
-            callbackAuthority: address(0), enforcesInitialPrice: true, rejectsExistingPoolPriceMismatch: true
+            callbackAuthority: address(manager), enforcesInitialPrice: true, rejectsExistingPoolPriceMismatch: true
         });
     }
 }
@@ -219,7 +219,7 @@ contract ProductionLaunchFactoryTest {
         ) = coordinator.canonicalPool();
         assert(poolToken == tokenAddress && poolQuote == address(manager));
         assert(venueId == keccak256("uniswap-v4") && poolId != bytes32(0));
-        assert(fee == 3_000 && tickSpacing == 60 && hook == address(0));
+        assert(fee == 3_000 && tickSpacing == 60 && hook == address(adapter));
         assert(storedPositionId == positionId && storedPositionLock == address(lock));
         assert(coordinator.manifestHash() == manifestHash);
         assert(manager.ownerOf(1) == address(lock));

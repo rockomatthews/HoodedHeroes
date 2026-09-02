@@ -1,6 +1,6 @@
 # Robinhood Uniswap v4 adapter candidate
 
-Status: **implemented, fork-rehearsed, unaudited, not authorized for deployment**.
+Status: **v1.6 remediation implemented, locally integrated, awaiting follow-up audit, not authorized for deployment**.
 
 ## Immutable venue configuration
 
@@ -11,19 +11,21 @@ Status: **implemented, fork-rehearsed, unaudited, not authorized for deployment*
 - Permit2: `0x000000000022D473030F116dDEE9F6B43aC78BA3`
 - Static LP fee: `3000` (`0.30%`)
 - Tick spacing: `60`
-- Hook: `address(0)` only
+- Hook: the adapter itself, CREATE2-mined with only Uniswap's `beforeInitialize` flag
 - Position range: greatest usable tick at or inside each Uniswap v4 global tick boundary
 
 The adapter constructor verifies that PositionManager reports the configured PoolManager and Permit2. Every constructor value is immutable and therefore included in the adapter runtime bytecode hash pinned by `ProductionLaunchFactory` and `RobinhoodLiquidityCoordinator`.
+
+`RobinhoodUniswapV4AdapterDeployer` is the ownerless production deployment path. Mine the CREATE2 salt off-chain against that deployer's confirmed address and the complete adapter init code, require the predicted address to carry exactly `BEFORE_INITIALIZE_FLAG`, and then call `deploy`. The adapter constructor repeats the flag check and fails closed. Record the deployer, salt, adapter address, init-code hash, and runtime-code hash; never mine on-chain or assume a CREATE2 deployer exists on chain without readback.
 
 Launch Bay v1.5 also replaces the oversized monolithic production factory with four immutable component deployers. Their CREATE2 salts include the calling factory address, preventing another caller from consuming its deterministic addresses. The factory pins and rechecks each component runtime hash before launch creation. Current optimized runtime sizes are: factory `10,292`, liquidity deployer `16,656`, sale deployer `18,371`, token deployer `3,735`, and vesting deployer `2,283` bytes; all are below EIP-170's `24,576`-byte limit.
 
 ## Finalization flow
 
-1. Pull exactly the coordinator-approved launch-token amount and wrap exactly the accounted native quote.
+1. Pull exactly the coordinator-approved launch-token amount. Wrap the complete native balance so a forced donation cannot block finalization; only `msg.value` participates in pricing.
 2. Sort launch token and WETH into the canonical v4 `PoolKey`.
 3. Derive `sqrtPriceX96` from the settled token/native ratio.
-4. Initialize an absent pool at that exact price, or reject an existing pool whose current price differs by any amount.
+4. Gate initialization through `beforeInitialize`, accepting only the pinned PoolManager when its original sender is the adapter. Then initialize at the exact price, or reject an existing mismatch.
 5. Compute full-range liquidity with Uniswap's `LiquidityAmounts` and `TickMath` libraries.
 6. Grant exact ERC20-to-Permit2 and Permit2-to-PositionManager allowances.
 7. Execute `MINT_POSITION` with explicit maximum token inputs followed by `SETTLE_PAIR`. The deprecated delta-derived mint action is not used.
@@ -35,7 +37,7 @@ Launch Bay v1.5 also replaces the oversized monolithic production factory with f
 
 The coordinator does not accept the adapter descriptor as proof. It independently:
 
-- reconstructs the zero-hook `PoolKey` and pool ID;
+- reconstructs the adapter-hook `PoolKey` and pool ID; the adapter constructor enforces that its mined address carries only `beforeInitialize`;
 - recomputes the exact sale-derived `sqrtPriceX96`;
 - reads PoolManager slot state through Uniswap `StateLibrary`;
 - requires the position to use the full usable tick range;
@@ -56,7 +58,7 @@ This closes the malicious self-attestation case where an adapter claims price pr
 - direct PositionManager NFT mint and permanent lock;
 - exact pool-price readback;
 - rejection of a conflicting existing-pool price;
-- absence of an adapter callback entry point; and
+- rejection of outsider and direct initialization-hook calls, plus absence of an unlock callback; and
 - the complete fixed-price fair-sale settlement through coordinator finalization.
 
 The 2026-09-01 local rehearsal passed all three adapter fork tests at Robinhood block `52,172,883`. The block number is evidence only and must not be reused as a deployment assumption.
@@ -64,7 +66,7 @@ The 2026-09-01 local rehearsal passed all three adapter fork tests at Robinhood 
 ## Remaining release gates
 
 - Independent review of the adapter, coordinator changes, imported Uniswap dependency versions, and compiled bytecode.
-- Auditor rerun of prior PoCs after the v1.5 interface change.
+- Auditor rerun of C-2/H-7 and every prior PoC against the v1.6 candidate.
 - Slither, Semgrep, SBOM, dependency-license, and reproducible-build evidence on the frozen commit.
 - Fresh runtime-code-hash and chain-ID readback immediately before any approved canary.
 - Decoded unsigned simulation and explicit transaction-level approval.

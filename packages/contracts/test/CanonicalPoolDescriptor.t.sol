@@ -83,7 +83,7 @@ contract DescriptorAdapter is IRobinhoodLiquidityAdapter {
 
     function securityConfiguration() external view returns (AdapterSecurityConfiguration memory configuration) {
         configuration = AdapterSecurityConfiguration({
-            callbackAuthority: mode == 1 ? address(0xBAD) : address(0),
+            callbackAuthority: mode == 1 ? address(0xBAD) : address(manager),
             enforcesInitialPrice: mode != 2,
             rejectsExistingPoolPriceMismatch: mode != 2
         });
@@ -103,7 +103,7 @@ contract DescriptorAdapter is IRobinhoodLiquidityAdapter {
             currency1: Currency.wrap(tokenIsCurrency0 ? wrappedNative : token),
             fee: 3_000,
             tickSpacing: 60,
-            hooks: IHooks(address(0))
+            hooks: IHooks(address(this))
         });
         uint256 amount0 = tokenIsCurrency0 ? tokenAmount : msg.value;
         uint256 amount1 = tokenIsCurrency0 ? msg.value : tokenAmount;
@@ -122,7 +122,7 @@ contract DescriptorAdapter is IRobinhoodLiquidityAdapter {
             poolId: mode == 4 ? bytes32(0) : PoolId.unwrap(key.toId()),
             fee: 3_000,
             tickSpacing: 60,
-            hook: mode == 8 ? address(0x1234) : address(0),
+            hook: mode == 8 ? address(0x1234) : address(this),
             positionId: mode == 5 ? positionId + 1 : positionId,
             positionLock: recipient
         });
@@ -174,7 +174,7 @@ contract CanonicalPoolDescriptorTest is Test {
         assertTrue(poolId != bytes32(0));
         assertEq(fee, 3_000);
         assertEq(tickSpacing, 60);
-        assertEq(hook, address(0));
+        assertTrue(hook != address(0));
         assertEq(positionId, finalizedPositionId);
         assertEq(positionLock, coordinator.positionLock());
         assertEq(coordinator.manifestHash(), manifestHash);
@@ -215,7 +215,7 @@ contract CanonicalPoolDescriptorTest is Test {
 
     function testFinalizeRejectsWrongCallbackAuthority() public {
         (RobinhoodLiquidityCoordinator coordinator,,,,) = _readyLaunch(1, 2);
-        vm.expectRevert(bytes("unexpected callback surface"));
+        vm.expectRevert(bytes("unexpected callback authority"));
         coordinator.finalize();
         assertFalse(coordinator.finalized());
     }
@@ -262,9 +262,9 @@ contract CanonicalPoolDescriptorTest is Test {
         assertFalse(coordinator.finalized());
     }
 
-    function testFinalizeRejectsAnyHook() public {
+    function testFinalizeRejectsUnexpectedHook() public {
         (RobinhoodLiquidityCoordinator coordinator,,,,) = _readyLaunch(8, 63);
-        vm.expectRevert(bytes("hook not allowed"));
+        vm.expectRevert(bytes("unexpected initialization hook"));
         coordinator.finalize();
         assertFalse(coordinator.finalized());
     }

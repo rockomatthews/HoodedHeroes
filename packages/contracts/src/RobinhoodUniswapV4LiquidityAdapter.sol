@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity 0.8.27;
+pragma solidity ^0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -8,6 +8,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
@@ -41,6 +42,7 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
     using StateLibrary for IPoolManager;
 
     bytes32 public constant VENUE_ID = keccak256("HOODED_UNISWAP_V4_ROBINHOOD");
+    uint160 public constant REQUIRED_HOOK_FLAGS = Hooks.BEFORE_INITIALIZE_FLAG;
 
     IPoolManager public immutable poolManager;
     IHoodedPositionManager public immutable positionManager;
@@ -78,6 +80,7 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
         );
         require(fee_ > 0 && fee_ < 1_000_000, "invalid fee");
         require(tickSpacing_ > 0 && tickSpacing_ <= TickMath.MAX_TICK_SPACING, "invalid tick spacing");
+        require(uint160(address(this)) & Hooks.ALL_HOOK_MASK == REQUIRED_HOOK_FLAGS, "adapter hook flags");
         poolManager = IPoolManager(poolManager_);
         positionManager = IHoodedPositionManager(positionManager_);
         permit2 = IAllowanceTransfer(permit2_);
@@ -94,10 +97,18 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
         require(msg.sender == address(wrappedNative), "only wrapped native");
     }
 
-    function securityConfiguration() external pure returns (AdapterSecurityConfiguration memory configuration) {
+    function securityConfiguration() external view returns (AdapterSecurityConfiguration memory configuration) {
         configuration = AdapterSecurityConfiguration({
-            callbackAuthority: address(0), enforcesInitialPrice: true, rejectsExistingPoolPriceMismatch: true
+            callbackAuthority: address(poolManager), enforcesInitialPrice: true, rejectsExistingPoolPriceMismatch: true
         });
+    }
+
+    /// @notice Gates pool initialization to this adapter. PoolManager supplies `sender`.
+    function beforeInitialize(address sender, PoolKey calldata key, uint160) external view returns (bytes4) {
+        require(msg.sender == address(poolManager), "only pool manager");
+        require(sender == address(this), "only adapter initializer");
+        require(address(key.hooks) == address(this), "wrong hook");
+        return this.beforeInitialize.selector;
     }
 
     function mintPermanentPosition(
@@ -117,7 +128,9 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
 
         IERC20 launchToken = IERC20(token);
         launchToken.safeTransferFrom(msg.sender, address(this), tokenAmount);
-        wrappedNative.deposit{value: msg.value}();
+        // Consume forced native donations as well as msg.value. Only msg.value participates
+        // in launch pricing; donated value is returned as WETH to refundRecipient below.
+        wrappedNative.deposit{value: address(this).balance}();
 
         (PoolKey memory key, uint256 amount0, uint256 amount1) = _poolKeyAndAmounts(token, tokenAmount, msg.value);
         PoolId id = key.toId();
@@ -164,9 +177,12 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
 
         uint256 tokenRefund = launchToken.balanceOf(address(this));
         if (tokenRefund > 0) launchToken.safeTransfer(msg.sender, tokenRefund);
+        // Also consume native value that a pinned external component may have returned
+        // during minting. There are no external calls capable of adding native value after this.
+        uint256 lateNativeDonation = address(this).balance;
+        if (lateNativeDonation > 0) wrappedNative.deposit{value: lateNativeDonation}();
         uint256 wrappedNativeRefund = IERC20(address(wrappedNative)).balanceOf(address(this));
         if (wrappedNativeRefund > 0) IERC20(address(wrappedNative)).safeTransfer(refundRecipient, wrappedNativeRefund);
-        require(address(this).balance == 0, "native residue");
         require(launchToken.balanceOf(address(this)) == 0, "token residue");
         require(IERC20(address(wrappedNative)).balanceOf(address(this)) == 0, "wrapped residue");
 
@@ -177,7 +193,7 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
             poolId: PoolId.unwrap(id),
             fee: fee,
             tickSpacing: tickSpacing,
-            hook: address(0),
+            hook: address(this),
             positionId: expectedPositionId,
             positionLock: positionRecipient
         });
@@ -218,7 +234,7 @@ contract RobinhoodUniswapV4LiquidityAdapter is IRobinhoodLiquidityAdapter, Reent
             currency1: Currency.wrap(currency1),
             fee: fee,
             tickSpacing: tickSpacing,
-            hooks: IHooks(address(0))
+            hooks: IHooks(address(this))
         });
     }
 

@@ -6,6 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {HookMiner} from "@uniswap/v4-periphery/src/utils/HookMiner.sol";
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol";
 import {FixedSupplyLaunchToken} from "../src/FixedSupplyLaunchToken.sol";
@@ -13,6 +15,7 @@ import {PermanentPositionReceiver} from "../src/PermanentPositionReceiver.sol";
 import {ProRataFairLaunch} from "../src/ProRataFairLaunch.sol";
 import {CanonicalPoolDescriptor, RobinhoodLiquidityCoordinator} from "../src/RobinhoodLiquidityCoordinator.sol";
 import {RobinhoodUniswapV4LiquidityAdapter} from "../src/RobinhoodUniswapV4LiquidityAdapter.sol";
+import {RobinhoodUniswapV4AdapterDeployer} from "../src/RobinhoodUniswapV4AdapterDeployer.sol";
 
 /// @notice Opt-in integration against a local fork of the canonical Robinhood Chain v4 deployment.
 /// @dev This never broadcasts. Enable with RUN_MAINNET_FORK_TESTS=true and RH_RPC_URL in `.env`.
@@ -50,7 +53,7 @@ contract RobinhoodUniswapV4LiquidityAdapterForkTest is Test {
         assertEq(descriptor.venueId, adapter.VENUE_ID());
         assertEq(descriptor.fee, FEE);
         assertEq(descriptor.tickSpacing, TICK_SPACING);
-        assertEq(descriptor.hook, address(0));
+        assertEq(descriptor.hook, address(adapter));
         assertEq(descriptor.positionLock, address(lock));
         assertTrue(lock.locked());
         assertEq(lock.positionId(), descriptor.positionId);
@@ -81,10 +84,11 @@ contract RobinhoodUniswapV4LiquidityAdapterForkTest is Test {
 
     function testConstructorRejectsWrongCanonicalBindingsWhenEnabled() public {
         if (!_selectRobinhoodFork()) return;
+        RobinhoodUniswapV4AdapterDeployer adapterDeployer = new RobinhoodUniswapV4AdapterDeployer();
         vm.expectRevert(bytes("wrong pool manager"));
-        new RobinhoodUniswapV4LiquidityAdapter(address(0x1111), POSITION_MANAGER, PERMIT2, WETH, FEE, TICK_SPACING);
+        _deployAdapterThrough(adapterDeployer, address(0x1111), POSITION_MANAGER, PERMIT2, WETH);
         vm.expectRevert(bytes("wrong permit2"));
-        new RobinhoodUniswapV4LiquidityAdapter(POOL_MANAGER, POSITION_MANAGER, address(0x2222), WETH, FEE, TICK_SPACING);
+        _deployAdapterThrough(adapterDeployer, POOL_MANAGER, POSITION_MANAGER, address(0x2222), WETH);
     }
 
     function testRobinhoodSaleToCanonicalPoolEndToEndWhenEnabled() public {
@@ -159,7 +163,10 @@ contract RobinhoodUniswapV4LiquidityAdapterForkTest is Test {
     }
 
     function _selectRobinhoodFork() private returns (bool) {
-        if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return false;
+        if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) {
+            vm.skip(true);
+            return false;
+        }
         string memory rpc = vm.envOr("RH_RPC_URL", string(""));
         require(bytes(rpc).length > 0, "RH_RPC_URL required");
         vm.createSelectFork(rpc);
@@ -168,6 +175,30 @@ contract RobinhoodUniswapV4LiquidityAdapterForkTest is Test {
     }
 
     function _deployAdapter() private returns (RobinhoodUniswapV4LiquidityAdapter) {
-        return new RobinhoodUniswapV4LiquidityAdapter(POOL_MANAGER, POSITION_MANAGER, PERMIT2, WETH, FEE, TICK_SPACING);
+        return _deployAdapterWithBindings(POOL_MANAGER, POSITION_MANAGER, PERMIT2, WETH);
+    }
+
+    function _deployAdapterWithBindings(address manager, address positions, address permit, address weth)
+        private
+        returns (RobinhoodUniswapV4LiquidityAdapter deployed)
+    {
+        RobinhoodUniswapV4AdapterDeployer adapterDeployer = new RobinhoodUniswapV4AdapterDeployer();
+        return _deployAdapterThrough(adapterDeployer, manager, positions, permit, weth);
+    }
+
+    function _deployAdapterThrough(
+        RobinhoodUniswapV4AdapterDeployer adapterDeployer,
+        address manager,
+        address positions,
+        address permit,
+        address weth
+    ) private returns (RobinhoodUniswapV4LiquidityAdapter deployed) {
+        bytes memory args = abi.encode(manager, positions, permit, weth, FEE, TICK_SPACING);
+        (, bytes32 salt) = HookMiner.find(
+            address(adapterDeployer), Hooks.BEFORE_INITIALIZE_FLAG, type(RobinhoodUniswapV4LiquidityAdapter).creationCode, args
+        );
+        deployed = RobinhoodUniswapV4LiquidityAdapter(
+            payable(adapterDeployer.deploy(salt, manager, positions, permit, weth, FEE, TICK_SPACING))
+        );
     }
 }

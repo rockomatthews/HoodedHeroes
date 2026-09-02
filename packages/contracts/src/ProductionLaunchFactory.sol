@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity 0.8.27;
+pragma solidity ^0.8.26;
 
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
@@ -18,7 +18,7 @@ import {
 contract ProductionLaunchFactory is EIP712 {
     using SafeERC20 for FixedSupplyLaunchToken;
 
-    string public constant TEMPLATE_VERSION = "1.5.0";
+    string public constant TEMPLATE_VERSION = "1.6.0";
     uint64 public constant MIN_COMMUNITY_VESTING_DURATION = 730 days;
     uint256 public constant MIN_VESTED_SUPPLY_BPS = 500;
     uint256 public constant MAX_VESTED_SUPPLY_BPS = 1_000;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity 0.8.27;
+pragma solidity ^0.8.26;
 
 /// @notice Launch-specific immutable allowlist. There is no post-deployment administrator.
 contract ImmutableReferralRegistry {

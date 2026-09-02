@@ -9,6 +9,7 @@ interface ForkVm {
     function envOr(string calldata name, bool defaultValue) external returns (bool value);
     function envOr(string calldata name, string calldata defaultValue) external returns (string memory value);
     function createSelectFork(string calldata urlOrAlias) external returns (uint256 forkId);
+    function skip(bool skipTest) external;
 }
 
 /// @notice Opt-in mainnet-state rehearsal. It never broadcasts and costs no gas.
@@ -16,7 +17,10 @@ contract LaunchFactoryForkTest {
     ForkVm internal constant vm = ForkVm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     function testRobinhoodMainnetForkOwnerCanaryWhenEnabled() public {
-        if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
+        if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) {
+            vm.skip(true);
+            return;
+        }
         string memory rpc = vm.envOr("RH_RPC_URL", string(""));
         require(bytes(rpc).length > 0, "RH_RPC_URL required");
         vm.createSelectFork(rpc);
@@ -24,7 +28,10 @@ contract LaunchFactoryForkTest {
     }
 
     function testBaseMainnetForkOwnerCanaryWhenEnabled() public {
-        if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
+        if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) {
+            vm.skip(true);
+            return;
+        }
         string memory rpc = vm.envOr("BASE_RPC_URL", string(""));
         require(bytes(rpc).length > 0, "BASE_RPC_URL required");
         vm.createSelectFork(rpc);
