@@ -5,10 +5,25 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PositionInfo} from "@uniswap/v4-periphery/src/libraries/PositionInfoLibrary.sol";
+import {PositionInfoLibrary} from "@uniswap/v4-periphery/src/libraries/PositionInfoLibrary.sol";
+import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmounts.sol";
 import {ProductionLaunchFactory} from "../src/ProductionLaunchFactory.sol";
 import {ProRataFairLaunch} from "../src/ProRataFairLaunch.sol";
 import {FixedSupplyLaunchToken} from "../src/FixedSupplyLaunchToken.sol";
 import {PermanentPositionReceiver} from "../src/PermanentPositionReceiver.sol";
+import {
+    ProductionTokenDeployer,
+    ProductionSaleDeployer,
+    ProductionLiquidityDeployer,
+    ProductionVestingDeployer
+} from "../src/ProductionComponentDeployers.sol";
 import {
     RobinhoodLiquidityCoordinator,
     IRobinhoodLiquidityAdapter,
@@ -17,7 +32,14 @@ import {
 } from "../src/RobinhoodLiquidityCoordinator.sol";
 
 contract DescriptorPositionManager is ERC721 {
+    using PoolIdLibrary for PoolKey;
+    using PositionInfoLibrary for PositionInfo;
+
     uint256 public nextId = 1;
+    PoolKey private configuredPoolKey;
+    uint160 private configuredSqrtPriceX96;
+    PositionInfo private configuredPositionInfo;
+    uint128 private configuredLiquidity;
 
     constructor() ERC721("Descriptor Position", "DLP") {}
 
@@ -25,9 +47,32 @@ contract DescriptorPositionManager is ERC721 {
         id = nextId++;
         _safeMint(recipient, id);
     }
+
+    function configure(PoolKey calldata key, uint160 sqrtPriceX96, uint128 liquidity, int24 lower, int24 upper)
+        external
+    {
+        configuredPoolKey = key;
+        configuredSqrtPriceX96 = sqrtPriceX96;
+        configuredPositionInfo = PositionInfoLibrary.initialize(key, lower, upper);
+        configuredLiquidity = liquidity;
+    }
+
+    function extsload(bytes32) external view returns (bytes32) {
+        return bytes32(uint256(configuredSqrtPriceX96));
+    }
+
+    function getPoolAndPositionInfo(uint256) external view returns (PoolKey memory, PositionInfo) {
+        return (configuredPoolKey, configuredPositionInfo);
+    }
+
+    function getPositionLiquidity(uint256) external view returns (uint128) {
+        return configuredLiquidity;
+    }
 }
 
 contract DescriptorAdapter is IRobinhoodLiquidityAdapter {
+    using PoolIdLibrary for PoolKey;
+
     DescriptorPositionManager public immutable manager;
     uint8 public immutable mode;
 
@@ -38,27 +83,46 @@ contract DescriptorAdapter is IRobinhoodLiquidityAdapter {
 
     function securityConfiguration() external view returns (AdapterSecurityConfiguration memory configuration) {
         configuration = AdapterSecurityConfiguration({
-            callbackAuthority: mode == 1 ? address(0xBAD) : address(manager),
+            callbackAuthority: mode == 1 ? address(0xBAD) : address(0),
             enforcesInitialPrice: mode != 2,
             rejectsExistingPoolPriceMismatch: mode != 2
         });
     }
 
-    function mintPermanentPosition(address token, address wrappedNative, uint256 tokenAmount, address recipient)
-        external
-        payable
-        returns (CanonicalPoolDescriptor memory descriptor)
-    {
+    function mintPermanentPosition(
+        address token,
+        address wrappedNative,
+        uint256 tokenAmount,
+        address recipient,
+        address
+    ) external payable returns (CanonicalPoolDescriptor memory descriptor) {
         require(IERC20(token).transferFrom(msg.sender, address(this), tokenAmount), "token transfer");
+        bool tokenIsCurrency0 = token < wrappedNative;
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(tokenIsCurrency0 ? token : wrappedNative),
+            currency1: Currency.wrap(tokenIsCurrency0 ? wrappedNative : token),
+            fee: 3_000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        });
+        uint256 amount0 = tokenIsCurrency0 ? tokenAmount : msg.value;
+        uint256 amount1 = tokenIsCurrency0 ? msg.value : tokenAmount;
+        uint160 sqrtPriceX96 = uint160(Math.sqrt(Math.mulDiv(amount1, uint256(1) << 192, amount0)));
+        int24 lower = (TickMath.MIN_TICK / int24(60)) * int24(60);
+        int24 upper = (TickMath.MAX_TICK / int24(60)) * int24(60);
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtPriceX96, TickMath.getSqrtPriceAtTick(lower), TickMath.getSqrtPriceAtTick(upper), amount0, amount1
+        );
+        manager.configure(key, mode == 7 ? sqrtPriceX96 + 1 : sqrtPriceX96, mode == 6 ? 1 : liquidity, lower, upper);
         uint256 positionId = manager.mint(recipient);
         descriptor = CanonicalPoolDescriptor({
             token: mode == 3 ? address(0xBAD) : token,
             quoteToken: wrappedNative,
             venueId: keccak256("uniswap-v4"),
-            poolId: mode == 4 ? bytes32(0) : keccak256(abi.encode(token, wrappedNative, uint24(3_000), int24(60))),
+            poolId: mode == 4 ? bytes32(0) : PoolId.unwrap(key.toId()),
             fee: 3_000,
             tickSpacing: 60,
-            hook: address(0),
+            hook: mode == 8 ? address(0x1234) : address(0),
             positionId: mode == 5 ? positionId + 1 : positionId,
             positionLock: recipient
         });
@@ -151,7 +215,7 @@ contract CanonicalPoolDescriptorTest is Test {
 
     function testFinalizeRejectsWrongCallbackAuthority() public {
         (RobinhoodLiquidityCoordinator coordinator,,,,) = _readyLaunch(1, 2);
-        vm.expectRevert(bytes("invalid callback authority"));
+        vm.expectRevert(bytes("unexpected callback surface"));
         coordinator.finalize();
         assertFalse(coordinator.finalized());
     }
@@ -180,6 +244,27 @@ contract CanonicalPoolDescriptorTest is Test {
     function testFinalizeRejectsPositionThatDoesNotMatchPermanentLock() public {
         (RobinhoodLiquidityCoordinator coordinator,,,,) = _readyLaunch(5, 6);
         vm.expectRevert(bytes("position not locked"));
+        coordinator.finalize();
+        assertFalse(coordinator.finalized());
+    }
+
+    function testFinalizeRejectsAdapterThatMintsOnlyDustLiquidity() public {
+        (RobinhoodLiquidityCoordinator coordinator,,,,) = _readyLaunch(6, 61);
+        vm.expectRevert(bytes("position liquidity mismatch"));
+        coordinator.finalize();
+        assertFalse(coordinator.finalized());
+    }
+
+    function testFinalizeRejectsAdapterWhosePoolPriceDoesNotMatchSale() public {
+        (RobinhoodLiquidityCoordinator coordinator,,,,) = _readyLaunch(7, 62);
+        vm.expectRevert(bytes("pool price mismatch"));
+        coordinator.finalize();
+        assertFalse(coordinator.finalized());
+    }
+
+    function testFinalizeRejectsAnyHook() public {
+        (RobinhoodLiquidityCoordinator coordinator,,,,) = _readyLaunch(8, 63);
+        vm.expectRevert(bytes("hook not allowed"));
         coordinator.finalize();
         assertFalse(coordinator.finalized());
     }
@@ -262,7 +347,7 @@ contract CanonicalPoolDescriptorTest is Test {
             bytes32 manifestHash
         )
     {
-        ProductionLaunchFactory factory = new ProductionLaunchFactory(vm.addr(APPROVER_KEY));
+        ProductionLaunchFactory factory = _factory(vm.addr(APPROVER_KEY));
         DescriptorPositionManager manager = new DescriptorPositionManager();
         DescriptorAdapter adapter = new DescriptorAdapter(address(manager), adapterMode);
         manifestHash = keccak256(abi.encode("canonical-pool", adapterMode, nonce));
@@ -289,26 +374,26 @@ contract CanonicalPoolDescriptorTest is Test {
 
         if (prefund > 0) {
             address predictedToken = vm.computeCreate2Address(
-                keccak256(abi.encode(manifestHash, "TOKEN")),
+                keccak256(abi.encode(address(factory), manifestHash, "TOKEN")),
                 keccak256(
                     abi.encodePacked(
                         type(FixedSupplyLaunchToken).creationCode,
                         abi.encode("Launch", "LCH", uint256(1_000 ether), address(factory), manifestHash)
                     )
                 ),
-                address(factory)
+                address(factory.tokenDeployer())
             );
             address predictedLock = vm.computeCreate2Address(
-                keccak256(abi.encode(manifestHash, "POSITION_LOCK")),
+                keccak256(abi.encode(address(factory), manifestHash, "POSITION_LOCK")),
                 keccak256(
                     abi.encodePacked(
                         type(PermanentPositionReceiver).creationCode, abi.encode(address(manager), address(adapter))
                     )
                 ),
-                address(factory)
+                address(factory.liquidityDeployer())
             );
             address predictedCoordinator = vm.computeCreate2Address(
-                keccak256(abi.encode(manifestHash, "LIQUIDITY_COORDINATOR")),
+                keccak256(abi.encode(address(factory), manifestHash, "LIQUIDITY_COORDINATOR")),
                 keccak256(
                     abi.encodePacked(
                         type(RobinhoodLiquidityCoordinator).creationCode,
@@ -327,7 +412,7 @@ contract CanonicalPoolDescriptorTest is Test {
                         )
                     )
                 ),
-                address(factory)
+                address(factory.liquidityDeployer())
             );
             assertEq(predictedCoordinator.code.length, 0);
             vm.deal(address(this), prefund);
@@ -350,6 +435,20 @@ contract CanonicalPoolDescriptorTest is Test {
         sale.contribute{value: 100 ether}(address(0));
         vm.warp(201);
         sale.settleFor(CREATOR);
+    }
+
+    function _factory(address approver) private returns (ProductionLaunchFactory) {
+        ProductionTokenDeployer tokenDeployer = new ProductionTokenDeployer();
+        ProductionSaleDeployer saleDeployer = new ProductionSaleDeployer();
+        ProductionLiquidityDeployer liquidityDeployer = new ProductionLiquidityDeployer();
+        ProductionVestingDeployer vestingDeployer = new ProductionVestingDeployer();
+        return new ProductionLaunchFactory(
+            approver,
+            address(tokenDeployer),
+            address(saleDeployer),
+            address(liquidityDeployer),
+            address(vestingDeployer)
+        );
     }
 
     function _saleConfig() private pure returns (ProRataFairLaunch.Config memory) {

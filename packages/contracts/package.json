@@ -2,7 +2,16 @@
   "name": "@hooded/contracts",
   "version": "0.1.0",
   "private": true,
-  "scripts": { "test": "forge test", "build": "forge build" },
-  "dependencies": { "@openzeppelin/contracts": "5.4.0" },
-  "devDependencies": { "forge-std": "github:foundry-rs/forge-std#v1.16.2" }
+  "scripts": {
+    "test": "forge test",
+    "build": "forge build"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "5.4.0",
+    "@uniswap/v4-core": "1.0.2",
+    "@uniswap/v4-periphery": "1.0.3"
+  },
+  "devDependencies": {
+    "forge-std": "github:foundry-rs/forge-std#v1.16.2"
+  }
 }

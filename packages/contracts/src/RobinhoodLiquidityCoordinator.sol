@@ -2,9 +2,20 @@
 pragma solidity 0.8.27;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
+import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmounts.sol";
+import {PositionInfo, PositionInfoLibrary} from "@uniswap/v4-periphery/src/libraries/PositionInfoLibrary.sol";
 import {ProRataFairLaunch} from "./ProRataFairLaunch.sol";
 
 struct CanonicalPoolDescriptor {
@@ -26,10 +37,13 @@ struct AdapterSecurityConfiguration {
 }
 
 interface IRobinhoodLiquidityAdapter {
-    function mintPermanentPosition(address token, address wrappedNative, uint256 tokenAmount, address positionRecipient)
-        external
-        payable
-        returns (CanonicalPoolDescriptor memory descriptor);
+    function mintPermanentPosition(
+        address token,
+        address wrappedNative,
+        uint256 tokenAmount,
+        address positionRecipient,
+        address refundRecipient
+    ) external payable returns (CanonicalPoolDescriptor memory descriptor);
 
     function securityConfiguration() external view returns (AdapterSecurityConfiguration memory configuration);
 }
@@ -47,6 +61,9 @@ interface IPermanentPositionReadback {
 /// @dev The adapter and position manager are pinned by runtime bytecode hash. There is no rescue or owner path.
 contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
     using SafeERC20 for IERC20;
+    using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
+    using PositionInfoLibrary for PositionInfo;
 
     ProRataFairLaunch public sale;
     address public immutable binder;
@@ -64,6 +81,8 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
     bool public finalized;
     bool public retired;
     uint256 public positionId;
+    uint160 public canonicalSqrtPriceX96;
+    uint128 public canonicalLiquidity;
     CanonicalPoolDescriptor public canonicalPool;
 
     event LiquidityFinalized(uint256 indexed positionId, uint256 tokenAmount, uint256 nativeAmount);
@@ -157,15 +176,17 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
             "code hash changed"
         );
         AdapterSecurityConfiguration memory security = adapter.securityConfiguration();
-        require(security.callbackAuthority == poolManager, "invalid callback authority");
+        require(security.callbackAuthority == address(0), "unexpected callback surface");
         require(security.enforcesInitialPrice && security.rejectsExistingPoolPriceMismatch, "price protection disabled");
         token.forceApprove(address(adapter), tokenAmount);
         CanonicalPoolDescriptor memory descriptor = adapter.mintPermanentPosition{value: nativeAmount}(
-            address(token), wrappedNative, tokenAmount, positionLock
+            address(token), wrappedNative, tokenAmount, positionLock, sale.proceedsRecipient()
         );
         token.forceApprove(address(adapter), 0);
-        _validateDescriptor(descriptor);
+        (uint160 sqrtPriceX96, uint128 liquidity) = _validateDescriptor(descriptor, tokenAmount, nativeAmount);
         canonicalPool = descriptor;
+        canonicalSqrtPriceX96 = sqrtPriceX96;
+        canonicalLiquidity = liquidity;
         mintedPositionId = descriptor.positionId;
         positionId = descriptor.positionId;
         uint256 unused = token.balanceOf(address(this));
@@ -207,12 +228,61 @@ contract RobinhoodLiquidityCoordinator is ReentrancyGuard {
         require(token.totalSupply() == supplyBefore - amount, "burn ineffective");
     }
 
-    function _validateDescriptor(CanonicalPoolDescriptor memory descriptor) private view {
+    function _validateDescriptor(CanonicalPoolDescriptor memory descriptor, uint256 tokenAmount, uint256 nativeAmount)
+        private
+        view
+        returns (uint160 sqrtPriceX96, uint128 liquidity)
+    {
         require(descriptor.token == address(token) && descriptor.quoteToken == wrappedNative, "pool asset mismatch");
         require(descriptor.venueId != bytes32(0) && descriptor.poolId != bytes32(0), "missing pool identity");
         require(descriptor.fee > 0 && descriptor.tickSpacing > 0, "invalid pool parameters");
+        require(descriptor.hook == address(0), "hook not allowed");
         require(descriptor.positionId > 0 && descriptor.positionLock == positionLock, "position mismatch");
         IPermanentPositionReadback lock = IPermanentPositionReadback(positionLock);
         require(lock.locked() && lock.positionId() == descriptor.positionId, "position not locked");
+
+        bool tokenIsCurrency0 = address(token) < wrappedNative;
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(tokenIsCurrency0 ? address(token) : wrappedNative),
+            currency1: Currency.wrap(tokenIsCurrency0 ? wrappedNative : address(token)),
+            fee: descriptor.fee,
+            tickSpacing: descriptor.tickSpacing,
+            hooks: IHooks(address(0))
+        });
+        PoolId id = key.toId();
+        require(PoolId.unwrap(id) == descriptor.poolId, "pool id mismatch");
+        uint256 amount0 = tokenIsCurrency0 ? tokenAmount : nativeAmount;
+        uint256 amount1 = tokenIsCurrency0 ? nativeAmount : tokenAmount;
+        uint160 targetSqrtPriceX96 = _encodeSqrtRatioX96(amount1, amount0);
+        (sqrtPriceX96,,,) = IPoolManager(poolManager).getSlot0(id);
+        require(sqrtPriceX96 == targetSqrtPriceX96, "pool price mismatch");
+
+        IPositionManager manager = IPositionManager(positionManager);
+        (PoolKey memory positionKey, PositionInfo positionInfo) = manager.getPoolAndPositionInfo(descriptor.positionId);
+        require(PoolId.unwrap(positionKey.toId()) == descriptor.poolId, "position pool mismatch");
+        int24 expectedTickLower = (TickMath.MIN_TICK / descriptor.tickSpacing) * descriptor.tickSpacing;
+        int24 expectedTickUpper = (TickMath.MAX_TICK / descriptor.tickSpacing) * descriptor.tickSpacing;
+        require(
+            positionInfo.tickLower() == expectedTickLower && positionInfo.tickUpper() == expectedTickUpper,
+            "position range mismatch"
+        );
+        require(IERC721(positionManager).ownerOf(descriptor.positionId) == positionLock, "position owner mismatch");
+        liquidity = manager.getPositionLiquidity(descriptor.positionId);
+        uint128 expectedLiquidity = LiquidityAmounts.getLiquidityForAmounts(
+            targetSqrtPriceX96,
+            TickMath.getSqrtPriceAtTick(expectedTickLower),
+            TickMath.getSqrtPriceAtTick(expectedTickUpper),
+            amount0,
+            amount1
+        );
+        require(expectedLiquidity > 0 && liquidity == expectedLiquidity, "position liquidity mismatch");
+    }
+
+    function _encodeSqrtRatioX96(uint256 amount1, uint256 amount0) private pure returns (uint160 sqrtPriceX96) {
+        require(amount0 > 0 && amount1 > 0, "zero price amount");
+        uint256 ratioX192 = Math.mulDiv(amount1, uint256(1) << 192, amount0);
+        uint256 sqrtRatio = Math.sqrt(ratioX192);
+        require(sqrtRatio >= TickMath.MIN_SQRT_PRICE && sqrtRatio <= TickMath.MAX_SQRT_PRICE, "price out of range");
+        sqrtPriceX96 = uint160(sqrtRatio);
     }
 }

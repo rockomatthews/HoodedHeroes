@@ -3,6 +3,15 @@ pragma solidity 0.8.27;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PositionInfo} from "@uniswap/v4-periphery/src/libraries/PositionInfoLibrary.sol";
+import {PositionInfoLibrary} from "@uniswap/v4-periphery/src/libraries/PositionInfoLibrary.sol";
+import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmounts.sol";
 import {ProductionLaunchFactory} from "../src/ProductionLaunchFactory.sol";
 import {ProRataFairLaunch} from "../src/ProRataFairLaunch.sol";
 import {
@@ -12,6 +21,12 @@ import {
     AdapterSecurityConfiguration
 } from "../src/RobinhoodLiquidityCoordinator.sol";
 import {PermanentPositionReceiver} from "../src/PermanentPositionReceiver.sol";
+import {
+    ProductionTokenDeployer,
+    ProductionSaleDeployer,
+    ProductionLiquidityDeployer,
+    ProductionVestingDeployer
+} from "../src/ProductionComponentDeployers.sol";
 import {FixedSupplyLaunchToken} from "../src/FixedSupplyLaunchToken.sol";
 import {TokenVestingVault} from "../src/TokenVestingVault.sol";
 
@@ -25,34 +40,82 @@ interface ProductionVm {
 }
 
 contract MockPositionManager is ERC721 {
+    using PoolIdLibrary for PoolKey;
+
     uint256 public nextId = 1;
+    PoolKey private configuredPoolKey;
+    uint160 private configuredSqrtPriceX96;
+    PositionInfo private configuredPositionInfo;
+    uint128 private configuredLiquidity;
     constructor() ERC721("Position", "LP") {}
 
     function mint(address recipient) external returns (uint256 id) {
         id = nextId++;
         _safeMint(recipient, id);
     }
+
+    function configure(PoolKey calldata key, uint160 sqrtPriceX96, uint128 liquidity, int24 lower, int24 upper)
+        external
+    {
+        configuredPoolKey = key;
+        configuredSqrtPriceX96 = sqrtPriceX96;
+        configuredPositionInfo = PositionInfoLibrary.initialize(key, lower, upper);
+        configuredLiquidity = liquidity;
+    }
+
+    function extsload(bytes32) external view returns (bytes32) {
+        return bytes32(uint256(configuredSqrtPriceX96));
+    }
+
+    function getPoolAndPositionInfo(uint256) external view returns (PoolKey memory, PositionInfo) {
+        return (configuredPoolKey, configuredPositionInfo);
+    }
+
+    function getPositionLiquidity(uint256) external view returns (uint128) {
+        return configuredLiquidity;
+    }
 }
 
 contract MockRobinhoodAdapter is IRobinhoodLiquidityAdapter {
+    using PoolIdLibrary for PoolKey;
+
     MockPositionManager public immutable manager;
 
     constructor(address manager_) {
         manager = MockPositionManager(manager_);
     }
 
-    function mintPermanentPosition(address token, address wrappedNative, uint256 tokenAmount, address recipient)
-        external
-        payable
-        returns (CanonicalPoolDescriptor memory descriptor)
-    {
+    function mintPermanentPosition(
+        address token,
+        address wrappedNative,
+        uint256 tokenAmount,
+        address recipient,
+        address
+    ) external payable returns (CanonicalPoolDescriptor memory descriptor) {
         require(IERC20(token).transferFrom(msg.sender, address(this), tokenAmount), "token transfer");
+        bool tokenIsCurrency0 = token < wrappedNative;
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(tokenIsCurrency0 ? token : wrappedNative),
+            currency1: Currency.wrap(tokenIsCurrency0 ? wrappedNative : token),
+            fee: 3_000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        });
+        uint256 amount0 = tokenIsCurrency0 ? tokenAmount : msg.value;
+        uint256 amount1 = tokenIsCurrency0 ? msg.value : tokenAmount;
+        uint160 sqrtPriceX96 = uint160(Math.sqrt(Math.mulDiv(amount1, uint256(1) << 192, amount0)));
+        int24 lower = (TickMath.MIN_TICK / int24(60)) * int24(60);
+        int24 upper = (TickMath.MAX_TICK / int24(60)) * int24(60);
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtPriceX96, TickMath.getSqrtPriceAtTick(lower), TickMath.getSqrtPriceAtTick(upper), amount0, amount1
+        );
+        manager.configure(key, sqrtPriceX96, liquidity, lower, upper);
         uint256 positionId = manager.mint(recipient);
         descriptor = CanonicalPoolDescriptor({
             token: token,
             quoteToken: wrappedNative,
             venueId: keccak256("uniswap-v4"),
-            poolId: keccak256(abi.encode(token, wrappedNative, uint24(3_000), int24(60), address(0))),
+            poolId: PoolId.unwrap(key.toId()),
             fee: 3_000,
             tickSpacing: 60,
             hook: address(0),
@@ -61,9 +124,9 @@ contract MockRobinhoodAdapter is IRobinhoodLiquidityAdapter {
         });
     }
 
-    function securityConfiguration() external view returns (AdapterSecurityConfiguration memory configuration) {
+    function securityConfiguration() external pure returns (AdapterSecurityConfiguration memory configuration) {
         configuration = AdapterSecurityConfiguration({
-            callbackAuthority: address(manager), enforcesInitialPrice: true, rejectsExistingPoolPriceMismatch: true
+            callbackAuthority: address(0), enforcesInitialPrice: true, rejectsExistingPoolPriceMismatch: true
         });
     }
 }
@@ -75,7 +138,7 @@ contract ProductionLaunchFactoryTest {
 
     function testApprovedFactoryDistributesAndLocksPriceMatchedLiquidity() public {
         address approver = vm.addr(APPROVER_KEY);
-        ProductionLaunchFactory factory = new ProductionLaunchFactory(approver);
+        ProductionLaunchFactory factory = _factory(approver);
         MockPositionManager manager = new MockPositionManager();
         MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
         bytes32 manifestHash = keccak256("production-manifest");
@@ -171,7 +234,7 @@ contract ProductionLaunchFactoryTest {
 
     function testApprovalBindsEveryConfigurationField() public {
         address approver = vm.addr(APPROVER_KEY);
-        ProductionLaunchFactory factory = new ProductionLaunchFactory(approver);
+        ProductionLaunchFactory factory = _factory(approver);
         MockPositionManager manager = new MockPositionManager();
         MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
         bytes32 manifestHash = keccak256("bound-manifest");
@@ -193,7 +256,7 @@ contract ProductionLaunchFactoryTest {
 
     function testFactoryRejectsNonNativeQuoteZeroLiquidityShareAndShortVesting() public {
         address approver = vm.addr(APPROVER_KEY);
-        ProductionLaunchFactory factory = new ProductionLaunchFactory(approver);
+        ProductionLaunchFactory factory = _factory(approver);
         MockPositionManager manager = new MockPositionManager();
         MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
         ProductionLaunchFactory.LiquidityConfig memory liquidity = _liquidity(manager, adapter);
@@ -233,7 +296,7 @@ contract ProductionLaunchFactoryTest {
 
     function testFactoryRejectsUndersizedLiquidityAndVestingOutsideFiveToTenPercent() public {
         address approver = vm.addr(APPROVER_KEY);
-        ProductionLaunchFactory factory = new ProductionLaunchFactory(approver);
+        ProductionLaunchFactory factory = _factory(approver);
         MockPositionManager manager = new MockPositionManager();
         MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
         ProductionLaunchFactory.TokenConfig memory tokenConfig =
@@ -274,7 +337,7 @@ contract ProductionLaunchFactoryTest {
 
     function testFactoryRejectsPastSaleEndBeforeDeployingVesting() public {
         vm.warp(1_000);
-        ProductionLaunchFactory factory = new ProductionLaunchFactory(vm.addr(APPROVER_KEY));
+        ProductionLaunchFactory factory = _factory(vm.addr(APPROVER_KEY));
         MockPositionManager manager = new MockPositionManager();
         MockRobinhoodAdapter adapter = new MockRobinhoodAdapter(address(manager));
         ProductionLaunchFactory.TokenConfig memory tokenConfig =
@@ -318,6 +381,20 @@ contract ProductionLaunchFactoryTest {
             liquidityShareBps: 3_750,
             burnUnsold: true
         });
+    }
+
+    function _factory(address approver) private returns (ProductionLaunchFactory) {
+        ProductionTokenDeployer tokenDeployer = new ProductionTokenDeployer();
+        ProductionSaleDeployer saleDeployer = new ProductionSaleDeployer();
+        ProductionLiquidityDeployer liquidityDeployer = new ProductionLiquidityDeployer();
+        ProductionVestingDeployer vestingDeployer = new ProductionVestingDeployer();
+        return new ProductionLaunchFactory(
+            approver,
+            address(tokenDeployer),
+            address(saleDeployer),
+            address(liquidityDeployer),
+            address(vestingDeployer)
+        );
     }
 
     function _liquidity(MockPositionManager manager, MockRobinhoodAdapter adapter)

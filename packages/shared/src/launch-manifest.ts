@@ -28,7 +28,7 @@ export type LaunchMetadataV1 = {
   sourceCommit: string;
   buildHash: string;
   immutableCoreHash: string;
-  factoryVersion: "1.4.1";
+  factoryVersion: "1.5.0";
   license: "AGPL-3.0-or-later";
   canonicalLaunchUrl: string;
   explorerUrl?: string;
@@ -229,7 +229,7 @@ export const HOODED_GENESIS_MANIFEST: LaunchManifestV1 = {
     sourceCommit: "0000000",
     buildHash: "0".repeat(64),
     immutableCoreHash: "0".repeat(64),
-    factoryVersion: "1.4.1",
+    factoryVersion: "1.5.0",
     license: "AGPL-3.0-or-later",
     canonicalLaunchUrl: "https://hooded.world/launch/hooded-genesis",
     authorities: { futureMint: false, freeze: false, blacklist: false, mutableTax: false, arbitraryUpgrade: false },

@@ -7,15 +7,18 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {FixedSupplyLaunchToken} from "./FixedSupplyLaunchToken.sol";
 import {ProRataFairLaunch} from "./ProRataFairLaunch.sol";
-import {RobinhoodLiquidityCoordinator} from "./RobinhoodLiquidityCoordinator.sol";
-import {PermanentPositionReceiver} from "./PermanentPositionReceiver.sol";
-import {TokenVestingVault} from "./TokenVestingVault.sol";
+import {
+    ProductionTokenDeployer,
+    ProductionSaleDeployer,
+    ProductionLiquidityDeployer,
+    ProductionVestingDeployer
+} from "./ProductionComponentDeployers.sol";
 
 /// @notice Immutable production factory. Creators require a manifest-bound approval from the review Safe.
 contract ProductionLaunchFactory is EIP712 {
     using SafeERC20 for FixedSupplyLaunchToken;
 
-    string public constant TEMPLATE_VERSION = "1.4.1";
+    string public constant TEMPLATE_VERSION = "1.5.0";
     uint64 public constant MIN_COMMUNITY_VESTING_DURATION = 730 days;
     uint256 public constant MIN_VESTED_SUPPLY_BPS = 500;
     uint256 public constant MAX_VESTED_SUPPLY_BPS = 1_000;
@@ -24,6 +27,14 @@ contract ProductionLaunchFactory is EIP712 {
         "LaunchApproval(address creator,bytes32 manifestHash,bytes32 configHash,uint256 nonce,uint256 deadline)"
     );
     address public immutable approvalSigner;
+    ProductionTokenDeployer public immutable tokenDeployer;
+    ProductionSaleDeployer public immutable saleDeployer;
+    ProductionLiquidityDeployer public immutable liquidityDeployer;
+    ProductionVestingDeployer public immutable vestingDeployer;
+    bytes32 public immutable tokenDeployerCodeHash;
+    bytes32 public immutable saleDeployerCodeHash;
+    bytes32 public immutable liquidityDeployerCodeHash;
+    bytes32 public immutable vestingDeployerCodeHash;
     mapping(bytes32 => bool) public usedManifestHash;
     mapping(address => mapping(uint256 => bool)) public usedApprovalNonce;
     mapping(bytes32 => mapping(uint256 => address)) public vestingVaultFor;
@@ -75,9 +86,32 @@ contract ProductionLaunchFactory is EIP712 {
         uint64 duration
     );
 
-    constructor(address approvalSigner_) EIP712("HOODED Launch Approval", "1") {
-        require(approvalSigner_ != address(0), "zero approval signer");
+    constructor(
+        address approvalSigner_,
+        address tokenDeployer_,
+        address saleDeployer_,
+        address liquidityDeployer_,
+        address vestingDeployer_
+    ) EIP712("HOODED Launch Approval", "1") {
+        require(
+            approvalSigner_ != address(0) && tokenDeployer_ != address(0) && saleDeployer_ != address(0)
+                && liquidityDeployer_ != address(0) && vestingDeployer_ != address(0),
+            "zero component"
+        );
+        require(
+            tokenDeployer_.code.length > 0 && saleDeployer_.code.length > 0 && liquidityDeployer_.code.length > 0
+                && vestingDeployer_.code.length > 0,
+            "missing component code"
+        );
         approvalSigner = approvalSigner_;
+        tokenDeployer = ProductionTokenDeployer(tokenDeployer_);
+        saleDeployer = ProductionSaleDeployer(saleDeployer_);
+        liquidityDeployer = ProductionLiquidityDeployer(liquidityDeployer_);
+        vestingDeployer = ProductionVestingDeployer(vestingDeployer_);
+        tokenDeployerCodeHash = tokenDeployer_.codehash;
+        saleDeployerCodeHash = saleDeployer_.codehash;
+        liquidityDeployerCodeHash = liquidityDeployer_.codehash;
+        vestingDeployerCodeHash = vestingDeployer_.codehash;
     }
 
     function createApprovedLaunch(
@@ -134,23 +168,34 @@ contract ProductionLaunchFactory is EIP712 {
         uint256 maximumLiquidityQuote = Math.mulDiv(saleConfig.maximumRaise, saleConfig.liquidityShareBps, BPS);
         uint256 requiredLiquidityTokens = Math.mulDiv(maximumLiquidityQuote, 1 ether, saleConfig.pricePerToken);
         require(liquidityConfig.tokenAllocation >= requiredLiquidityTokens, "liquidity allocation too small");
-        bytes32 tokenSalt = keccak256(abi.encode(tokenConfig.manifestHash, "TOKEN"));
-        FixedSupplyLaunchToken token = new FixedSupplyLaunchToken{salt: tokenSalt}(
-            tokenConfig.name, tokenConfig.symbol, tokenConfig.supply, address(this), tokenConfig.manifestHash
+        _assertComponentCode();
+        FixedSupplyLaunchToken token = FixedSupplyLaunchToken(
+            tokenDeployer.deploy(
+                tokenConfig.manifestHash, tokenConfig.name, tokenConfig.symbol, tokenConfig.supply, address(this)
+            )
         );
         require(liquidityConfig.tokenAllocation > 0, "zero liquidity allocation");
-        (RobinhoodLiquidityCoordinator coordinator, PermanentPositionReceiver positionLock) =
-            _deployLiquidity(address(token), tokenConfig.manifestHash, liquidityConfig);
+        (address coordinator, address positionLock) = liquidityDeployer.deploy(
+            tokenConfig.manifestHash,
+            address(token),
+            liquidityConfig.wrappedNative,
+            liquidityConfig.wrappedNativeCodeHash,
+            liquidityConfig.adapter,
+            liquidityConfig.adapterCodeHash,
+            liquidityConfig.poolManager,
+            liquidityConfig.poolManagerCodeHash,
+            liquidityConfig.positionManager,
+            liquidityConfig.positionManagerCodeHash
+        );
         ProRataFairLaunch.Config memory config = saleConfig;
         config.saleToken = address(token);
         config.creator = msg.sender;
-        config.liquidityRecipient = address(coordinator);
-        bytes32 saleSalt = keccak256(abi.encode(tokenConfig.manifestHash, "SALE"));
-        ProRataFairLaunch fairLaunch = new ProRataFairLaunch{salt: saleSalt}(config);
-        coordinator.bindSale(address(fairLaunch));
+        config.liquidityRecipient = coordinator;
+        ProRataFairLaunch fairLaunch = ProRataFairLaunch(payable(saleDeployer.deploy(tokenConfig.manifestHash, config)));
+        liquidityDeployer.bindSale(coordinator, address(fairLaunch));
         uint256 allocated = config.saleAllocation + liquidityConfig.tokenAllocation;
         token.safeTransfer(address(fairLaunch), config.saleAllocation);
-        token.safeTransfer(address(coordinator), liquidityConfig.tokenAllocation);
+        token.safeTransfer(coordinator, liquidityConfig.tokenAllocation);
         for (uint256 i; i < otherAllocations.length; ++i) {
             require(otherAllocations[i].recipient != address(0), "zero allocation recipient");
             allocated += otherAllocations[i].amount;
@@ -161,22 +206,21 @@ contract ProductionLaunchFactory is EIP712 {
             VestedAllocation calldata allocation = vestedAllocations[i];
             require(allocation.beneficiary != address(0) && allocation.amount > 0, "invalid vested allocation");
             require(allocation.duration >= MIN_COMMUNITY_VESTING_DURATION, "vesting below minimum");
-            TokenVestingVault vault = new TokenVestingVault{
-                salt: keccak256(abi.encode(tokenConfig.manifestHash, "VESTING", i))
-            }(
-                address(token), allocation.beneficiary, saleConfig.endsAt, allocation.duration, allocation.amount
-            );
-            vestingVaultFor[tokenConfig.manifestHash][i] = address(vault);
-            allocated += allocation.amount;
-            totalVested += allocation.amount;
-            token.safeTransfer(address(vault), allocation.amount);
-            emit VestingVaultCreated(
+            address vault = vestingDeployer.deploy(
                 tokenConfig.manifestHash,
                 i,
-                address(vault),
+                address(token),
                 allocation.beneficiary,
-                allocation.amount,
-                allocation.duration
+                saleConfig.endsAt,
+                allocation.duration,
+                allocation.amount
+            );
+            vestingVaultFor[tokenConfig.manifestHash][i] = vault;
+            allocated += allocation.amount;
+            totalVested += allocation.amount;
+            token.safeTransfer(vault, allocation.amount);
+            emit VestingVaultCreated(
+                tokenConfig.manifestHash, i, vault, allocation.beneficiary, allocation.amount, allocation.duration
             );
         }
         require(
@@ -187,9 +231,7 @@ contract ProductionLaunchFactory is EIP712 {
             totalVested <= Math.mulDiv(tokenConfig.supply, MAX_VESTED_SUPPLY_BPS, BPS), "vested allocation too large"
         );
         require(allocated == tokenConfig.supply && token.balanceOf(address(this)) == 0, "allocation mismatch");
-        _emitLaunch(
-            address(token), address(fairLaunch), address(coordinator), address(positionLock), tokenConfig.manifestHash
-        );
+        _emitLaunch(address(token), address(fairLaunch), coordinator, positionLock, tokenConfig.manifestHash);
         return (address(token), address(fairLaunch));
     }
 
@@ -203,27 +245,13 @@ contract ProductionLaunchFactory is EIP712 {
         emit LaunchCreated(msg.sender, token, fairLaunch, coordinator, positionLock, manifestHash);
     }
 
-    function _deployLiquidity(address token, bytes32 manifestHash, LiquidityConfig calldata config)
-        private
-        returns (RobinhoodLiquidityCoordinator coordinator, PermanentPositionReceiver positionLock)
-    {
-        positionLock = new PermanentPositionReceiver{salt: keccak256(abi.encode(manifestHash, "POSITION_LOCK"))}(
-            config.positionManager, config.adapter
-        );
-        coordinator = new RobinhoodLiquidityCoordinator{
-            salt: keccak256(abi.encode(manifestHash, "LIQUIDITY_COORDINATOR"))
-        }(
-            manifestHash,
-            token,
-            config.wrappedNative,
-            config.wrappedNativeCodeHash,
-            config.adapter,
-            config.adapterCodeHash,
-            config.poolManager,
-            config.poolManagerCodeHash,
-            config.positionManager,
-            config.positionManagerCodeHash,
-            address(positionLock)
+    function _assertComponentCode() private view {
+        require(
+            address(tokenDeployer).codehash == tokenDeployerCodeHash
+                && address(saleDeployer).codehash == saleDeployerCodeHash
+                && address(liquidityDeployer).codehash == liquidityDeployerCodeHash
+                && address(vestingDeployer).codehash == vestingDeployerCodeHash,
+            "component code changed"
         );
     }
 }
