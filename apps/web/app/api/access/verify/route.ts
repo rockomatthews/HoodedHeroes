@@ -2,7 +2,7 @@ import { verifyMessage } from "viem";
 import { z } from "zod";
 import { readWalletAccess } from "@/lib/server/onchain-access";
 import { challengeMessage, consumeChallenge, createSocietySession, readChallenge } from "@/lib/server/session";
-import { assertSameOrigin, publicError } from "@/lib/server/request-security";
+import { assertSameOrigin, publicError, requireDatabaseRateLimit } from "@/lib/server/request-security";
 import { databaseConfigured, db } from "@/lib/server/database";
 import { canaryModeEnabled, isLaunchCanaryOwner } from "@/lib/server/launch-canary";
 
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     const wallet = body.wallet as `0x${string}`;
     const valid = await verifyMessage({ address: wallet, message: challengeMessage(challenge, wallet), signature: body.signature as `0x${string}` });
     if (!valid) return Response.json({ error: "Invalid wallet signature" }, { status: 401 });
+    await requireDatabaseRateLimit("society-access-verify", wallet, 10, 15 * 60);
     const evidence = canaryModeEnabled() && isLaunchCanaryOwner(wallet)
       ? { hoodedBalance: 0n, genesisHeroBalance: 0n, access: "hero" as const }
       : await readWalletAccess(wallet);

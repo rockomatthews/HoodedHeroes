@@ -23,8 +23,20 @@ const rpcUrl = process.env.RH_RPC_URL || localValue("RH_RPC_URL");
 if (!rpcUrl) throw new Error("RH_RPC_URL is required in .env");
 let id = 0;
 async function rpc(method, params = []) {
-  const response = await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });
-  const payload = await response.json();
+  let response;
+  try {
+    response = await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });
+  } catch {
+    throw new Error("The configured RPC endpoint failed its TLS or network connection");
+  }
+  const raw = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    if (/endpoint is disabled/i.test(raw)) throw new Error("The configured RPC endpoint is disabled by its provider");
+    throw new Error(`RPC ${response.status} returned a non-JSON response`);
+  }
   if (!response.ok || payload.error) throw new Error(payload.error?.message ?? `RPC ${response.status}`);
   return payload.result;
 }

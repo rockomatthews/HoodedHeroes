@@ -1,6 +1,6 @@
 # Robinhood Chain Uniswap readback
 
-Read-only QuickNode evidence refreshed on 2026-08-31 at Robinhood Chain block `51,454,759` (chain ID `4663`). Re-run `pnpm production:uniswap-readback:rh` immediately before any deployment and compare every address and runtime hash; this record is evidence, not permission to broadcast.
+Read-only evidence refreshed on 2026-09-04 at Robinhood Chain block `54,631,206` (chain ID `4663`). The configured QuickNode endpoint alternated between a TLS handshake failure and an explicit `endpoint is disabled` response, so the successful readback used Robinhood Chain's documented public mainnet RPC. Repair and revalidate the configured production provider before relying on it. Re-run `pnpm production:uniswap-readback:rh` immediately before any deployment and compare every address and runtime hash; this record is evidence, not permission to broadcast.
 
 | Contract | Address | Runtime Keccak-256 |
 |---|---|---|

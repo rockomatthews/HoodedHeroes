@@ -1,6 +1,6 @@
 import { readWalletAccess, accessConfigurationReady } from "@/lib/server/onchain-access";
 import { createSocietySession, getSocietySession } from "@/lib/server/session";
-import { publicError } from "@/lib/server/request-security";
+import { publicError, requireDatabaseRateLimit } from "@/lib/server/request-security";
 import { databaseConfigured, db } from "@/lib/server/database";
 import { canaryModeEnabled, isLaunchCanaryOwner } from "@/lib/server/launch-canary";
 
@@ -24,6 +24,8 @@ export async function GET() {
       );
     }
 
+    await requireDatabaseRateLimit("society-access-status", session.wallet, 30, 60);
+
     const evidence = canaryModeEnabled() && isLaunchCanaryOwner(session.wallet)
       ? { hoodedBalance: 0n, genesisHeroBalance: 0n, access: "hero" as const }
       : await readWalletAccess(session.wallet);
@@ -33,7 +35,7 @@ export async function GET() {
       await sql`insert into society_members (wallet_address, access_level, hooded_balance, genesis_hero_balance, last_verified_at) values (${session.wallet.toLowerCase()}, ${evidence.access}, ${evidence.hoodedBalance.toString()}, ${evidence.genesisHeroBalance.toString()}, now()) on conflict (wallet_address) do update set access_level = excluded.access_level, hooded_balance = excluded.hooded_balance, genesis_hero_balance = excluded.genesis_hero_balance, last_verified_at = now()`;
     }
 
-    const refreshed = await createSocietySession({ wallet: session.wallet, access: evidence.access });
+    const refreshed = await createSocietySession({ wallet: session.wallet, access: evidence.access }, session.expiresAt);
     return Response.json({
       configured: true,
       authenticated: true,

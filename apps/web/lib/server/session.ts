@@ -66,10 +66,11 @@ export function challengeMessage(challenge: ChallengePayload, wallet: string) {
   ].join("\n");
 }
 
-export async function createSocietySession(payload: Omit<SignedPayload, "expiresAt">) {
-  const session: SignedPayload = { ...payload, expiresAt: Date.now() + 15 * 60_000 };
+export async function createSocietySession(payload: Omit<SignedPayload, "expiresAt">, expiresAt = Date.now() + 15 * 60_000) {
+  const session: SignedPayload = { ...payload, expiresAt };
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, encode(session), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 900 });
+  const maxAge = Math.max(0, Math.min(900, Math.ceil((expiresAt - Date.now()) / 1_000)));
+  cookieStore.set(SESSION_COOKIE, encode(session), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge });
   return session;
 }
 

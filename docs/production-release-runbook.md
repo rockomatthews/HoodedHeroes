@@ -81,6 +81,8 @@ The independent adapter audit, unbound-token-holder/direct-allocation-holder rej
 
 Apply `docs/migrations/20260902_command_center_districts.sql`, then verify every row in `docs/command-center-release-matrix.md`. Power Grid practice must never award credit. Assembly must require a real reviewed evidence hash and a Hero-gated session. Stock Token Vault must remain claimless and must not say funded until current four-part eligibility plus a contract-backed funded pool are indexed. Workshop saves only loadout drafts and cannot spend Salary Credits. Code Bazaar, Launch Bay, and Community Signal must fail closed when GitHub, Sandbox, database, audit, or Hero gates are missing. Exercise every district on desktop and mobile before public access.
 
+Society wallet verification and live access refresh require PostgreSQL-backed per-wallet rate limits. Verification permits at most 10 signed checks per 15 minutes; authenticated status permits at most 30 live refreshes per minute. Refresh may update the signed access level but must preserve the session's original 15-minute expiration rather than creating an indefinitely sliding session.
+
 ## Gate 6 — Genesis Heroes
 
 Deploy `HoodedGenesis` only with the final HOODED address, reward vault, DAO timelock, founder recipient, public-mint timestamp, nonzero metadata root, and immutable IPFS base URI. Constructor readback must prove token IDs 1–10 are Recruit NFTs owned by the founder, total minted is 10, Recruit minted is 10, and the founder primary-mint flag is consumed. Public mint begins at least seven days after verified HOODED liquidity.
