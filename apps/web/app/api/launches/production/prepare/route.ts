@@ -4,12 +4,10 @@ import { canonicalJson, validateLaunchManifest, type LaunchManifestV1 } from "@h
 import { assertSameOrigin, publicError, requireDatabaseRateLimit, requireIdempotencyKey } from "@/lib/server/request-security";
 import { getSocietySession } from "@/lib/server/session";
 import { immutableMetadataCoreMatches, metadataRevisionMatches, metadataRevisionSignatureValid } from "@/lib/server/manifest-integrity";
+import { CANONICAL_RH_V4_POOL_MANAGER, CANONICAL_RH_V4_POSITION_MANAGER, CANONICAL_RH_WETH, isRobinhoodMainnetChain, productionLiquidityPins, requestedLiquidityPinsMatch, ROBINHOOD_MAINNET_CHAIN_ID } from "@/lib/production-liquidity-pins";
 
 export const runtime = "nodejs";
 const ZERO = "0x0000000000000000000000000000000000000000" as Address;
-const CANONICAL_RH_WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73" as Address;
-const CANONICAL_RH_V4_POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951" as Address;
-const CANONICAL_RH_V4_POSITION_MANAGER = "0x58daec3116aae6d93017baaea7749052e8a04fa7" as Address;
 const address = z.string().refine(isAddress, "Invalid address");
 const hex32 = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
 const signature = z.string().regex(/^0x[a-fA-F0-9]{130}$/);
@@ -120,7 +118,8 @@ export async function POST(request: Request) {
     const timelockRaw = process.env.RH_DAO_TIMELOCK_ADDRESS;
     const timelockHash = process.env.RH_DAO_TIMELOCK_CODE_HASH?.toLowerCase() as Hex | undefined;
     const approvalSignerRaw = process.env.RH_LAUNCH_APPROVAL_SIGNER;
-    if (!rpcUrl || !factoryRaw || !factoryHash || !rewardVaultRaw || !rewardVaultHash || !timelockRaw || !timelockHash || !approvalSignerRaw || !isAddress(factoryRaw) || !isAddress(rewardVaultRaw) || !isAddress(timelockRaw) || !isAddress(approvalSignerRaw)) {
+    const liquidityPins = productionLiquidityPins(process.env);
+    if (!rpcUrl || !factoryRaw || !factoryHash || !rewardVaultRaw || !rewardVaultHash || !timelockRaw || !timelockHash || !approvalSignerRaw || !liquidityPins || !isAddress(factoryRaw) || !isAddress(rewardVaultRaw) || !isAddress(timelockRaw) || !isAddress(approvalSignerRaw)) {
       return Response.json({ error: "Verified Robinhood Chain production contracts are not configured" }, { status: 503 });
     }
     const factory = getAddress(factoryRaw);
@@ -135,8 +134,11 @@ export async function POST(request: Request) {
     if (getAddress(execution.poolManager) !== CANONICAL_RH_V4_POOL_MANAGER || getAddress(execution.positionManager) !== CANONICAL_RH_V4_POSITION_MANAGER) {
       return Response.json({ error: "Canonical Robinhood Chain Uniswap v4 manager mismatch" }, { status: 422 });
     }
+    if (!requestedLiquidityPinsMatch(execution, liquidityPins)) return Response.json({ error: "Liquidity adapter generation or runtime code hashes do not match the reviewed server configuration" }, { status: 422 });
     const client = createPublicClient({ transport: http(rpcUrl) });
-    const adapterAddress = getAddress(execution.liquidityAdapter);
+    const rpcChainId = await client.getChainId();
+    if (!isRobinhoodMainnetChain(rpcChainId)) return Response.json({ error: `Robinhood Chain RPC mismatch: expected ${ROBINHOOD_MAINNET_CHAIN_ID}` }, { status: 409 });
+    const adapterAddress = liquidityPins.adapterAddress;
     const [factoryCode, rewardCode, timelockCode, wethCode, adapterCode, poolManagerCode, managerCode, onchainApprovalSigner, factoryLiquidityDeployer, adapterFactory, adapterCoordinatorDeployer, adapterPoolManager, adapterPositionManager] = await Promise.all([
       client.getCode({ address: factory }), client.getCode({ address: rewardVault }),
       client.getCode({ address: timelock }),
@@ -152,10 +154,10 @@ export async function POST(request: Request) {
     if (!factoryCode || keccak256(factoryCode).toLowerCase() !== factoryHash) return Response.json({ error: "Production factory bytecode mismatch" }, { status: 409 });
     if (!rewardCode || keccak256(rewardCode).toLowerCase() !== rewardVaultHash) return Response.json({ error: "Reward vault bytecode mismatch" }, { status: 409 });
     if (!timelockCode || keccak256(timelockCode).toLowerCase() !== timelockHash) return Response.json({ error: "DAO timelock bytecode mismatch" }, { status: 409 });
-    if (!wethCode || keccak256(wethCode).toLowerCase() !== execution.wrappedNativeCodeHash.toLowerCase()) return Response.json({ error: "WETH bytecode mismatch" }, { status: 409 });
-    if (!adapterCode || keccak256(adapterCode).toLowerCase() !== execution.liquidityAdapterCodeHash.toLowerCase()) return Response.json({ error: "Liquidity adapter bytecode mismatch" }, { status: 409 });
-    if (!poolManagerCode || keccak256(poolManagerCode).toLowerCase() !== execution.poolManagerCodeHash.toLowerCase()) return Response.json({ error: "Pool manager bytecode mismatch" }, { status: 409 });
-    if (!managerCode || keccak256(managerCode).toLowerCase() !== execution.positionManagerCodeHash.toLowerCase()) return Response.json({ error: "Position manager bytecode mismatch" }, { status: 409 });
+    if (!wethCode || keccak256(wethCode).toLowerCase() !== liquidityPins.wrappedNativeCodeHash) return Response.json({ error: "WETH bytecode mismatch" }, { status: 409 });
+    if (!adapterCode || keccak256(adapterCode).toLowerCase() !== liquidityPins.adapterCodeHash) return Response.json({ error: "Liquidity adapter bytecode mismatch" }, { status: 409 });
+    if (!poolManagerCode || keccak256(poolManagerCode).toLowerCase() !== liquidityPins.poolManagerCodeHash) return Response.json({ error: "Pool manager bytecode mismatch" }, { status: 409 });
+    if (!managerCode || keccak256(managerCode).toLowerCase() !== liquidityPins.positionManagerCodeHash) return Response.json({ error: "Position manager bytecode mismatch" }, { status: 409 });
     if (getAddress(onchainApprovalSigner) !== getAddress(approvalSignerRaw)) return Response.json({ error: "Factory approval signer mismatch" }, { status: 409 });
     if (getAddress(adapterFactory) !== factory) return Response.json({ error: "Liquidity adapter is not bound to the configured production factory" }, { status: 409 });
     if (getAddress(adapterCoordinatorDeployer) !== getAddress(factoryLiquidityDeployer)) return Response.json({ error: "Liquidity adapter coordinator deployer binding mismatch" }, { status: 409 });
@@ -177,10 +179,10 @@ export async function POST(request: Request) {
       liquidityShareBps: manifest.sale.liquidityQuoteShareBps, burnUnsold: true,
     };
     const liquidityConfig = {
-      tokenAllocation: exactAllocation(supply, manifest.sale.liquidityAllocationBps), wrappedNative: CANONICAL_RH_WETH, wrappedNativeCodeHash: execution.wrappedNativeCodeHash as Hex,
-      adapter: getAddress(execution.liquidityAdapter), adapterCodeHash: execution.liquidityAdapterCodeHash as Hex,
-      poolManager: CANONICAL_RH_V4_POOL_MANAGER, poolManagerCodeHash: execution.poolManagerCodeHash as Hex,
-      positionManager: CANONICAL_RH_V4_POSITION_MANAGER, positionManagerCodeHash: execution.positionManagerCodeHash as Hex,
+      tokenAllocation: exactAllocation(supply, manifest.sale.liquidityAllocationBps), wrappedNative: CANONICAL_RH_WETH, wrappedNativeCodeHash: liquidityPins.wrappedNativeCodeHash,
+      adapter: liquidityPins.adapterAddress, adapterCodeHash: liquidityPins.adapterCodeHash,
+      poolManager: CANONICAL_RH_V4_POOL_MANAGER, poolManagerCodeHash: liquidityPins.poolManagerCodeHash,
+      positionManager: CANONICAL_RH_V4_POSITION_MANAGER, positionManagerCodeHash: liquidityPins.positionManagerCodeHash,
     };
     const otherAllocations = [
       { recipient: getAddress(execution.rewardsAllocationRecipient), amount: exactAllocation(supply, manifest.sale.rewardsAllocationBps) },
@@ -199,7 +201,7 @@ export async function POST(request: Request) {
         prepared: false,
         approvalRequired: true,
         typedData: {
-          domain: { name: "HOODED Launch Approval", version: "1", chainId: 4663, verifyingContract: factory },
+          domain: { name: "HOODED Launch Approval", version: "1", chainId: ROBINHOOD_MAINNET_CHAIN_ID, verifyingContract: factory },
           primaryType: "LaunchApproval",
           types: {
             LaunchApproval: [
@@ -221,7 +223,7 @@ export async function POST(request: Request) {
     const gas = await client.estimateGas({ account: session.wallet as Address, to: factory, data });
     return Response.json({
       prepared: true,
-      unsigned: { chainId: 4663, from: session.wallet, to: factory, data, value: "0", gas: gas.toString() },
+      unsigned: { chainId: ROBINHOOD_MAINNET_CHAIN_ID, from: session.wallet, to: factory, data, value: "0", gas: gas.toString() },
       receipt: { manifestHash, configHash, predictedToken: simulation.result[0], predictedSale: simulation.result[1], factoryCodeHash: factoryHash },
       idempotencyKey,
       warning: "Unsigned only. HOODED never broadcasts this transaction or stores a private key.",

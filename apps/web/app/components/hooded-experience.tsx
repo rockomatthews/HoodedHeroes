@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { CommandCenter } from "./command-center";
+import { SocietyAccessGate } from "./society-access-gate";
 
 type Hero = {
   name: string;
@@ -24,12 +25,26 @@ const HEROES: Hero[] = [
 ];
 
 export function HoodedExperience() {
-  const [connected, setConnected] = useState(false);
   const [selectedHero, setSelectedHero] = useState<Hero | null>(null);
   const [inCommandCenter, setInCommandCenter] = useState(false);
+  const [societyUnlocked, setSocietyUnlocked] = useState(false);
+  const unlockSociety = useCallback(() => setSocietyUnlocked(true), []);
+
+  function enterSociety() {
+    setSocietyUnlocked(false);
+    setInCommandCenter(true);
+  }
+
+  function leaveSociety() {
+    setSocietyUnlocked(false);
+    setInCommandCenter(false);
+  }
 
   if (inCommandCenter) {
-    return <CommandCenter onExit={() => setInCommandCenter(false)} />;
+    return <>
+      <CommandCenter locked={!societyUnlocked} onExit={leaveSociety} />
+      {!societyUnlocked && <SocietyAccessGate onExit={leaveSociety} onUnlock={unlockSociety} />}
+    </>;
   }
 
   return (
@@ -56,15 +71,15 @@ export function HoodedExperience() {
           ))}
         </section>
 
-        <button className="restricted-door" aria-label="Enter the Society headquarters" onClick={() => setInCommandCenter(true)}>
+        <button className="restricted-door" aria-label="Enter the Society headquarters" onClick={enterSociety}>
           <div className="door-sign">Headquarters<br />Access restricted</div>
           <div className="door-frame"><span className="door-hood" /><i className="door-eye door-eye--left" /><i className="door-eye door-eye--right" /></div>
           <span className="door-action">Enter Society →</span>
         </button>
 
-        <button className={`wallet-card ${connected ? "wallet-card--connected" : ""}`} onClick={() => setConnected((value) => !value)}>
+        <button className="wallet-card" onClick={enterSociety} aria-label="Verify wallet for Society access">
           <span className="wallet-icon"><i /></span>
-          <span className="wallet-copy"><strong>{connected ? "WALLET CONNECTED" : "CONNECT WALLET"}</strong><small>{connected ? "PREVIEW CLEARANCE // 0x7A2…91F" : "ENTER WITH 25,000 $HOODED"}</small></span>
+          <span className="wallet-copy"><strong>VERIFY WALLET</strong><small>ENTER WITH 25,000 $HOODED</small></span>
         </button>
 
         <div className="genesis-counter"><span className="mini-hoods"><i /><i /><i /></span><b /><div><strong>3,000</strong><small>Genesis Heroes</small></div></div>

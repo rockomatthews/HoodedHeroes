@@ -149,13 +149,14 @@ const MOBILE_ZONES = [
   { id: "houses", label: "HOUSES", icon: "⬡", x: 0.91 },
 ] as const;
 
-export function CommandCenter({ onExit }: { onExit: () => void }) {
+export function CommandCenter({ onExit, locked = false }: { onExit: () => void; locked?: boolean }) {
   const [activeRoom, setActiveRoom] = useState<RoomId | null>(null);
   const [mobileZone, setMobileZone] = useState("SIGNAL");
   const viewportRef = useRef<HTMLElement>(null);
   const active = activeRoom ? ROOMS[activeRoom] : null;
 
   function travelTo(x: number, label: string) {
+    if (locked) return;
     const viewport = viewportRef.current;
     if (!viewport) return;
     setActiveRoom(null);
@@ -183,7 +184,7 @@ export function CommandCenter({ onExit }: { onExit: () => void }) {
       <div className="command-stage">
         <Image className="command-art" src={commandCenterArt} alt="The HOODED Command Center, with interactive rooms arranged around a six-house city map" fill priority sizes="100vw" />
         <div className="command-brand-overlay" aria-hidden="true"><strong>HOODED</strong><span>COMMAND CENTER</span></div>
-        <button className="community-signal-beacon" aria-label="Open Community Signal and HOODED Creed" onClick={() => setActiveRoom("community-signal")}>
+        <button className="community-signal-beacon" aria-label="Open Community Signal and HOODED Creed" disabled={locked} onClick={() => setActiveRoom("community-signal")}>
           <span>THE CREED</span>
           <strong>COMMUNITY BUILT.</strong>
           <small>EVERY UTILITY // FOREVER IMPROVED</small>
@@ -194,6 +195,7 @@ export function CommandCenter({ onExit }: { onExit: () => void }) {
             key={spot.id}
             className={`command-hotspot ${spot.className}`}
             aria-label={spot.label}
+            disabled={locked && spot.id !== "home"}
             onClick={() => spot.id === "home" ? onExit() : setActiveRoom(spot.id)}
           ><span>{spot.label}</span></button>
         ))}
@@ -201,7 +203,7 @@ export function CommandCenter({ onExit }: { onExit: () => void }) {
       </div>
       <div className="mobile-map-hud" aria-hidden="true"><b>HOODED TRANSIT</b><span>{active ? active.label.toUpperCase() : `${mobileZone} DISTRICT`}</span><i>{active ? "ROOM OPEN // SCROLL DOSSIER" : "SWIPE THE MAP"}</i></div>
       <nav className="mobile-map-dock" aria-label="Command Center district navigation">
-        {MOBILE_ZONES.map((zone) => <button key={zone.id} className={mobileZone === zone.label ? "is-active" : ""} onClick={() => travelTo(zone.x, zone.label)}><i>{zone.icon}</i><span>{zone.label}</span></button>)}
+        {MOBILE_ZONES.map((zone) => <button key={zone.id} disabled={locked} className={mobileZone === zone.label ? "is-active" : ""} onClick={() => travelTo(zone.x, zone.label)}><i>{zone.icon}</i><span>{zone.label}</span></button>)}
       </nav>
     </section>
   );

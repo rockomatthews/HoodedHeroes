@@ -1,12 +1,22 @@
 import "server-only";
 
-import { createPublicClient, getAddress, http, parseAbi } from "viem";
+import { createPublicClient, getAddress, http, isAddress, parseAbi, zeroAddress } from "viem";
 import { evaluateSocietyAccess } from "@hooded/shared";
 
 const balanceAbi = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 export function accessConfigurationReady() {
-  return Boolean(process.env.RH_RPC_URL && process.env.HOODED_TOKEN_ADDRESS && process.env.GENESIS_HERO_ADDRESS);
+  const token = process.env.HOODED_TOKEN_ADDRESS;
+  const heroes = process.env.GENESIS_HERO_ADDRESS;
+  return Boolean(
+    process.env.RH_RPC_URL
+      && token
+      && heroes
+      && isAddress(token)
+      && isAddress(heroes)
+      && getAddress(token) !== zeroAddress
+      && getAddress(heroes) !== zeroAddress,
+  );
 }
 
 export async function readWalletAccess(wallet: `0x${string}`) {

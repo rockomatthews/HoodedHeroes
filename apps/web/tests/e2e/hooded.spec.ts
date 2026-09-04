@@ -1,4 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function grantHeroAccess(page: Page) {
+  await page.route("**/api/access/status", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ configured: true, authenticated: true, wallet: "0x1111111111111111111111111111111111111111", access: "hero", hoodedBalance: "25000000000000000000000", genesisHeroBalance: "1" }),
+    });
+  });
+}
 
 test("the comic-cover entry portal never scrolls", async ({ page }) => {
   await page.goto("/");
@@ -19,11 +29,34 @@ test("each founding hero opens a contained dossier", async ({ page }) => {
   }
 });
 
-test("wallet preview state is clearly simulated", async ({ page }) => {
+test("the Society reveals the map before presenting the HOODED seal", async ({ page }) => {
+  await page.route("**/api/access/status", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ configured: true, authenticated: false, access: "vestibule" }) }));
   await page.goto("/");
-  await page.getByRole("button", { name: /connect wallet/i }).click();
-  await expect(page.getByText("WALLET CONNECTED")).toBeVisible();
-  await expect(page.getByText(/preview clearance/i)).toBeVisible();
+  await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
+  await expect(page.getByRole("region", { name: "HOODED Command Center" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "HOODED membership required" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "HOODED membership required" })).toBeVisible();
+  await expect(page.getByText("MINIMUM SIGNAL REQUIRED")).toBeVisible();
+  await expect(page.getByText("25,000", { exact: true })).toBeVisible();
+  await expect(page.getByText("Hold this amount to reveal the second seal.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Launch Bay" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "SIGN IN TO VERIFY" })).toBeVisible();
+});
+
+test("a verified HOODED holder meets the separate Genesis Hero seal", async ({ page }) => {
+  await page.route("**/api/access/status", async (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ configured: true, authenticated: true, wallet: "0x2222222222222222222222222222222222222222", access: "preview", hoodedBalance: "25000000000000000000000", genesisHeroBalance: "0" }),
+  }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
+  const gate = page.getByRole("dialog", { name: "Genesis Hero access required" });
+  await expect(gate).toBeVisible();
+  await expect(gate.getByText("FIRST SEAL ACCEPTED")).toBeVisible();
+  await expect(gate.getByText("OWN 1 GENESIS HERO")).toBeVisible();
+  await expect(gate.getByText("0 HEROES DETECTED")).toBeVisible();
+  await expect(gate.getByRole("link", { name: /ACQUIRE A GENESIS HERO/ })).toHaveAttribute("href", "/launch/hooded-genesis#genesis-heroes");
 });
 
 test("the public genesis vestibule uses the HOODED token identity", async ({ page }) => {
@@ -31,16 +64,18 @@ test("the public genesis vestibule uses the HOODED token identity", async ({ pag
   await expect(page).toHaveTitle("HOODED (HOODED) — HOODED Launch Bay");
   await expect(page.getByRole("heading", { level: 1, name: "HOODED" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "$HOODED" })).toBeVisible();
-  await expect(page.getByText("25,000 HOODED unlocks society preview")).toBeVisible();
+  await expect(page.getByText("25,000 HOODED reveals the second seal")).toBeVisible();
 });
 
 test("mobile Command Center uses a zoomed comic district rail", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Mobile navigation only");
+  await grantHeroAccess(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
   const viewport = page.getByRole("region", { name: "HOODED Command Center" });
   const districtRail = page.getByRole("navigation", { name: "Command Center district navigation" });
   await expect(districtRail).toBeVisible();
+  await expect(districtRail.getByRole("button", { name: /LAUNCH/ })).toBeEnabled();
   await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(300);
   const initial = await viewport.evaluate((element) => ({ left: element.scrollLeft, width: element.clientWidth, world: element.scrollWidth }));
   expect(initial.world).toBeGreaterThan(initial.width * 2);
@@ -56,6 +91,7 @@ test("mobile Command Center uses a zoomed comic district rail", async ({ page },
 
 test("the headquarters door is the Society entrance", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === "mobile-chrome", "Mobile navigation is covered by the district-rail flow");
+  await grantHeroAccess(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
   await expect(page.getByRole("region", { name: "HOODED Command Center" })).toBeVisible();
@@ -63,7 +99,7 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
   expect(dimensions.width).toBeLessThanOrEqual(dimensions.viewportWidth);
   expect(dimensions.height).toBeLessThanOrEqual(dimensions.viewportHeight);
 
-  await expect(page.getByRole("button", { name: "Open Community Signal and HOODED Creed" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Community Signal and HOODED Creed" })).toBeEnabled();
   await page.getByRole("button", { name: "Open Community Signal and HOODED Creed" }).click();
   await expect(page.getByRole("dialog", { name: "Community Signal panel" })).toBeVisible();
   await expect(page.getByRole("region", { name: "The HOODED Creed" })).toBeVisible();
@@ -152,9 +188,12 @@ test("the headquarters door is the Society entrance", async ({ page }, testInfo)
 });
 
 test("Launch Bay leads with HOODED genesis and keeps incomplete evidence blocked", async ({ page }, testInfo) => {
+  await grantHeroAccess(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Enter the Society headquarters" }).click();
-  await page.getByRole("button", { name: "Open Launch Bay" }).click();
+  const launchButton = page.getByRole("button", { name: "Open Launch Bay" });
+  await expect(launchButton).toBeEnabled();
+  await launchButton.click();
   const launchPanel = page.getByRole("dialog", { name: "Launch Bay panel" });
   await expect(launchPanel).toBeVisible();
   if (testInfo.project.name === "desktop-chrome") {

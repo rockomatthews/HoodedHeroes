@@ -53,7 +53,7 @@ Repeat HLAB1 evidence, then activate the thirty-minute owner-only sale with a fo
 
 1. Preserve every prior remediation/PoC suite, obtain review of the v1.7 factory-provenance changes and Command Center APIs, then have two independent reviewers approve the final source and bytecode including the Uniswap v4 adapter.
 2. Deploy and verify the approval registry/Safe, reward vault, four component deployers, production factory, factory-bound liquidity adapter, and PositionManager integration. Deploy the factory before mining the adapter address. Read back that `adapter.authorizedFactory()` equals that exact factory and `adapter.coordinatorDeployer()` equals `factory.liquidityDeployer()`. The factory creates and funds the community vesting vault as part of launch creation.
-3. Configure only verified addresses and runtime hashes in `.env`/Vercel environment variables.
+3. Configure only verified addresses and runtime hashes in `.env`/Vercel environment variables. `RH_V4_ADAPTER_ADDRESS`, `RH_V4_ADAPTER_CODE_HASH`, `RH_WETH_CODE_HASH`, `RH_V4_POOL_MANAGER_CODE_HASH`, and `RH_V4_POSITION_MANAGER_CODE_HASH` must pin the exact reviewed adapter generation and canonical venue bytecode. The production prepare route must reject request-selected replacements and must read chain ID `4663` from the configured RPC before any contract readback.
 4. Change `ENABLE_PRODUCTION_LAUNCH_PREPARE` only after the infrastructure readback passes.
 5. Obtain the Safe EIP-712 approval bound to creator, manifest hash, complete configuration hash, nonce, and deadline.
 6. Use `/api/launches/production/prepare` to simulate and generate the unsigned creation transaction.
